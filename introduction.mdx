@@ -1,0 +1,103 @@
+---
+title: Introduction
+description: Learn about the Gestión de Gastos Mibanco expense tracking system
+---
+
+## Overview
+
+Gestión de Gastos is a robust command-line application built with **Java 17** for managing personal expenses. Developed by Anghelo Mendoza Prado as a technical challenge for the Software Engineering Intern position at Mibanco, this application provides a complete expense management solution with automatic persistence and financial precision.
+
+## What is Gestión de Gastos?
+
+This expense tracking system allows you to manage all aspects of your personal finances through an intuitive console interface. The application stores your expense data locally in JSON format and provides powerful filtering capabilities to help you track spending patterns over time.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Complete CRUD Operations" icon="database">
+    Create, read, update, and delete expenses with full validation
+  </Card>
+  <Card title="Local Persistence" icon="floppy-disk">
+    Automatic storage in JSON format using Jackson library
+  </Card>
+  <Card title="Financial Precision" icon="calculator">
+    BigDecimal with HALF_UP rounding ensures accurate monetary calculations
+  </Card>
+  <Card title="Dynamic Filtering" icon="filter">
+    Search expenses by month and year with chronological sorting
+  </Card>
+</CardGroup>
+
+## Core Concepts
+
+### Expense Model
+
+Each expense (`Gasto`) in the system contains the following attributes:
+
+- **ID**: Unique identifier (UUID) - displayed as 8-character short ID
+- **Title**: Required description of the expense
+- **Reason**: Optional detailed explanation
+- **Date**: Transaction date in ISO format (YYYY-MM-DD)
+- **Amount**: Monetary value with 2-decimal precision (Peruvian Soles)
+
+<Note>
+  The application uses `BigDecimal` instead of `double` to avoid floating-point precision errors common in financial calculations. All amounts are automatically rounded to 2 decimal places using the HALF_UP rounding mode.
+</Note>
+
+### Architecture
+
+The project follows a **clean layered architecture** ensuring the Single Responsibility Principle (SRP) and enabling easy testing through dependency injection:
+
+<Steps>
+  <Step title="Model Layer">
+    Domain entities like `Gasto` that represent your expense data
+  </Step>
+  
+  <Step title="Repository Layer">
+    Data access through `GastoRepository` interface and `FileGastoRepository` implementation
+  </Step>
+  
+  <Step title="Service Layer">
+    Business logic and validation rules in `GastoService`
+  </Step>
+  
+  <Step title="UI Layer">
+    Console interface in `Consola` class for user interaction
+  </Step>
+</Steps>
+
+## Technology Stack
+
+The application is built with modern Java technologies:
+
+- **Language**: Java 17 with modern APIs
+- **Build Tool**: Apache Maven
+- **Date/Time**: `java.time` API for modern date handling
+- **Precision**: `java.math.BigDecimal` for financial calculations
+- **Persistence**: Jackson (jackson-databind, jackson-datatype-jsr310)
+- **Testing**: JUnit 5 for unit tests
+- **CI/CD**: GitHub Actions for automated testing
+
+## Use Cases
+
+Gestión de Gastos is ideal for:
+
+- **Personal Finance Tracking**: Keep detailed records of daily expenses
+- **Monthly Budgeting**: Filter expenses by month to analyze spending patterns
+- **Expense Reporting**: Generate chronologically sorted expense lists
+- **Financial Planning**: Understand spending habits through data-driven insights
+
+<Warning>
+  The application stores data locally in a `gastos.json` file in the same directory where you run the application. Make sure to back up this file regularly if you're tracking important financial data.
+</Warning>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Set up Java 17, Maven, and clone the repository
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Run your first expense tracking session
+  </Card>
+</CardGroup>

@@ -1,0 +1,436 @@
+---
+title: "GastoService"
+description: "Complete API reference for the GastoService business logic layer"
+---
+
+## Overview
+
+The `GastoService` class implements the business logic for managing expenses. It provides operations for creating, updating, deleting, listing, and filtering expenses while enforcing validation rules.
+
+**Package:** `com.mibanco.gastos.service`
+
+**Location:** `src/main/java/com/mibanco/gastos/service/GastoService.java`
+
+## Constructor
+
+### GastoService
+
+```java
+public GastoService(GastoRepository repository)
+```
+
+Creates a new `GastoService` instance with dependency injection for the repository.
+
+<ParamField path="repository" type="GastoRepository" required>
+  The repository implementation to use for data persistence
+</ParamField>
+
+**Usage:**
+
+```java
+GastoRepository repository = new FileGastoRepository();
+GastoService service = new GastoService(repository);
+```
+
+<Note>
+  Constructor injection is used to facilitate unit testing with mock repositories.
+</Note>
+
+## Public Methods
+
+### agregarGasto()
+
+```java
+public void agregarGasto(String titulo, String motivo, LocalDate fecha, BigDecimal monto)
+```
+
+Creates and saves a new expense with automatic UUID generation.
+
+<ParamField path="titulo" type="String" required>
+  Title of the expense. Cannot be null or empty (after trimming).
+</ParamField>
+
+<ParamField path="motivo" type="String">
+  Reason or description for the expense. Can be null or empty.
+</ParamField>
+
+<ParamField path="fecha" type="LocalDate" required>
+  Date when the expense occurred. Cannot be null.
+</ParamField>
+
+<ParamField path="monto" type="BigDecimal" required>
+  Amount of the expense. Must be greater than zero.
+</ParamField>
+
+**Throws:**
+
+- `GastoException` - If titulo is null/empty, fecha is null, or monto is null/zero/negative
+
+**Validation Rules:**
+
+1. **Título:** Must not be null or empty after trimming whitespace
+2. **Fecha:** Must not be null
+3. **Monto:** Must not be null and must be greater than zero
+
+**Usage:**
+
+```java
+service.agregarGasto(
+    "Almuerzo",
+    "Comida con cliente",
+    LocalDate.of(2024, 3, 15),
+    new BigDecimal("45.50")
+);
+```
+
+<CodeGroup>
+```java Valid Example
+service.agregarGasto(
+    "Taxi",
+    "Transporte a oficina central",
+    LocalDate.now(),
+    new BigDecimal("25.00")
+);
+```
+
+```java Invalid - Empty Title
+// Throws GastoException: "El título del gasto no puede estar vacío"
+service.agregarGasto(
+    "",
+    "Motivo",
+    LocalDate.now(),
+    new BigDecimal("10.00")
+);
+```
+
+```java Invalid - Zero Amount
+// Throws GastoException: "El monto del gasto debe ser mayor a cero"
+service.agregarGasto(
+    "Título",
+    "Motivo",
+    LocalDate.now(),
+    BigDecimal.ZERO
+);
+```
+</CodeGroup>
+
+### actualizarGasto()
+
+```java
+public void actualizarGasto(String idCorto, String titulo, String motivo, LocalDate fecha, BigDecimal monto)
+```
+
+Updates an existing expense identified by its short ID (first characters of UUID).
+
+<ParamField path="idCorto" type="String" required>
+  Short ID of the expense (minimum 8 characters from the UUID). Can be the full UUID or a prefix.
+</ParamField>
+
+<ParamField path="titulo" type="String" required>
+  New title for the expense. Cannot be null or empty.
+</ParamField>
+
+<ParamField path="motivo" type="String">
+  New reason/description for the expense.
+</ParamField>
+
+<ParamField path="fecha" type="LocalDate" required>
+  New date for the expense. Cannot be null.
+</ParamField>
+
+<ParamField path="monto" type="BigDecimal" required>
+  New amount for the expense. Must be greater than zero.
+</ParamField>
+
+**Throws:**
+
+- `GastoException` - If idCorto is invalid, expense not found, or validation fails
+
+**Validation Rules:**
+
+1. **ID Corto:** Must be at least 8 characters long
+2. **ID Corto:** Must match exactly one expense (not zero, not multiple)
+3. Same validation rules as `agregarGasto()` for other fields
+
+**Usage:**
+
+```java
+// Update using first 8 characters of UUID
+service.actualizarGasto(
+    "a1b2c3d4",
+    "Almuerzo Actualizado",
+    "Motivo actualizado",
+    LocalDate.of(2024, 3, 16),
+    new BigDecimal("50.00")
+);
+```
+
+<Expandable title="Short ID Matching Logic">
+  The method uses `obtenerUUIDPorIdCorto()` internally to resolve the short ID:
+  
+  1. Searches all expenses for UUIDs starting with the provided prefix
+  2. If no matches: throws "No se encontró ningún gasto que coincida con el ID proporcionado"
+  3. If multiple matches: throws "El ID ingresado coincide con múltiples gastos. Ingrese más caracteres"
+  4. If exactly one match: proceeds with the update
+  
+  **Example Scenarios:**
+  - `"a1b2c3d4"` matches `a1b2c3d4-5678-90ab-cdef-1234567890ab` ✓
+  - `"a1b2"` matches multiple UUIDs starting with "a1b2" ✗
+  - `"xyz123"` matches no UUIDs ✗
+</Expandable>
+
+### eliminarGasto()
+
+```java
+public void eliminarGasto(String idCorto)
+```
+
+Deletes an expense identified by its short ID.
+
+<ParamField path="idCorto" type="String" required>
+  Short ID of the expense to delete (minimum 8 characters). Must uniquely identify one expense.
+</ParamField>
+
+**Throws:**
+
+- `GastoException` - If idCorto is invalid, expense not found, or matches multiple expenses
+
+**Validation:**
+
+1. Short ID must be at least 8 characters
+2. Must match exactly one expense in the repository
+3. Expense must exist before deletion
+
+**Usage:**
+
+```java
+// Delete using short ID
+service.eliminarGasto("a1b2c3d4");
+```
+
+<Note>
+  The method verifies that the expense exists before attempting deletion. If the expense is not found, it throws a descriptive exception message.
+</Note>
+
+### listarGastos()
+
+```java
+public List<Gasto> listarGastos()
+```
+
+Retrieves all expenses sorted by date in descending order (most recent first).
+
+<ResponseField name="return" type="List<Gasto>">
+  List of all expenses sorted by fecha descending. Returns empty list if no expenses exist.
+</ResponseField>
+
+**Sorting:**
+
+- Primary sort: By `fecha` (date) in descending order
+- Most recent expenses appear first
+
+**Usage:**
+
+```java
+List<Gasto> gastos = service.listarGastos();
+for (Gasto gasto : gastos) {
+    System.out.println(gasto);
+}
+```
+
+**Example Output:**
+
+```
+[d4e5f6a7] 2024-03-20 | Cena | Cliente importante | S/ 120.00
+[c3d4e5f6] 2024-03-18 | Taxi | Transporte | S/ 25.50
+[b2c3d4e5] 2024-03-15 | Almuerzo | Reunión equipo | S/ 45.00
+```
+
+### filtrarGastosPorMes()
+
+```java
+public List<Gasto> filtrarGastosPorMes(int mes, int anio)
+```
+
+Filters expenses by month and year, returning results sorted by date descending.
+
+<ParamField path="mes" type="int" required>
+  Month number (1-12). January = 1, December = 12.
+</ParamField>
+
+<ParamField path="anio" type="int" required>
+  Year as a 4-digit integer (e.g., 2024).
+</ParamField>
+
+<ResponseField name="return" type="List<Gasto>">
+  List of expenses from the specified month and year, sorted by fecha descending. Returns empty list if no matches.
+</ResponseField>
+
+**Throws:**
+
+- `GastoException` - If mes is not between 1 and 12
+
+**Validation:**
+
+- Month must be in the range [1, 12]
+- Year can be any integer value (no validation)
+
+**Usage:**
+
+```java
+// Get all expenses from March 2024
+List<Gasto> gastosMarzo = service.filtrarGastosPorMes(3, 2024);
+
+// Get all expenses from December 2023
+List<Gasto> gastosEnero = service.filtrarGastosPorMes(12, 2023);
+```
+
+<CodeGroup>
+```java Valid Month Filter
+List<Gasto> gastos = service.filtrarGastosPorMes(3, 2024);
+System.out.println("Gastos de Marzo 2024: " + gastos.size());
+```
+
+```java Invalid Month
+// Throws GastoException: "El mes debe estar entre 1 y 12"
+List<Gasto> gastos = service.filtrarGastosPorMes(13, 2024);
+```
+</CodeGroup>
+
+## Private Helper Methods
+
+### validarDatosGasto()
+
+```java
+private void validarDatosGasto(String titulo, LocalDate fecha, BigDecimal monto)
+```
+
+Centralizes business validation rules for expense data. Used internally by `agregarGasto()` and `actualizarGasto()`.
+
+**Validation Rules:**
+
+<Expandable title="Title Validation">
+  ```java
+  if (titulo == null || titulo.trim().isEmpty()) {
+      throw new GastoException("El título del gasto no puede estar vacío");
+  }
+  ```
+  - Must not be null
+  - Must not be empty after trimming whitespace
+</Expandable>
+
+<Expandable title="Date Validation">
+  ```java
+  if (fecha == null) {
+      throw new GastoException("La fecha del gasto es obligatoria");
+  }
+  ```
+  - Must not be null
+  - No restriction on past/future dates
+</Expandable>
+
+<Expandable title="Amount Validation">
+  ```java
+  if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
+      throw new GastoException("El monto del gasto debe ser mayor a cero");
+  }
+  ```
+  - Must not be null
+  - Must be strictly greater than zero
+  - Zero and negative values are rejected
+</Expandable>
+
+### obtenerUUIDPorIdCorto()
+
+```java
+private UUID obtenerUUIDPorIdCorto(String idCorto)
+```
+
+Translates short IDs (UUID prefixes) to full UUIDs by searching the repository.
+
+**Algorithm:**
+
+1. Validates that `idCorto` has at least 8 characters
+2. Searches all expenses for UUIDs starting with `idCorto`
+3. Returns the UUID if exactly one match is found
+4. Throws exception if zero or multiple matches
+
+**Exception Messages:**
+
+- Short ID < 8 chars: `"Debe ingresar al menos los primeros 8 caracteres del ID"`
+- No matches: `"No se encontró ningún gasto que coincida con el ID proporcionado"`
+- Multiple matches: `"El ID ingresado coincide con múltiples gastos. Ingrese más caracteres"`
+
+## Complete Usage Example
+
+```java
+import com.mibanco.gastos.service.GastoService;
+import com.mibanco.gastos.repository.FileGastoRepository;
+import com.mibanco.gastos.model.Gasto;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
+public class ServiceExample {
+    public static void main(String[] args) {
+        // Initialize service with repository
+        GastoService service = new GastoService(new FileGastoRepository());
+        
+        // Add new expense
+        service.agregarGasto(
+            "Almuerzo",
+            "Comida con cliente",
+            LocalDate.of(2024, 3, 15),
+            new BigDecimal("45.50")
+        );
+        
+        // List all expenses
+        List<Gasto> todos = service.listarGastos();
+        todos.forEach(System.out::println);
+        
+        // Filter by month
+        List<Gasto> marzoGastos = service.filtrarGastosPorMes(3, 2024);
+        System.out.println("Gastos de Marzo: " + marzoGastos.size());
+        
+        // Update expense (use short ID from listing)
+        String shortId = todos.get(0).getId().toString().substring(0, 8);
+        service.actualizarGasto(
+            shortId,
+            "Almuerzo Actualizado",
+            "Nuevo motivo",
+            LocalDate.of(2024, 3, 16),
+            new BigDecimal("50.00")
+        );
+        
+        // Delete expense
+        service.eliminarGasto(shortId);
+    }
+}
+```
+
+## Exception Handling
+
+All public methods may throw `GastoException` (unchecked exception) for:
+
+- **Validation errors:** Invalid input data
+- **Not found errors:** Expense with given ID doesn't exist
+- **Ambiguous ID errors:** Short ID matches multiple expenses
+- **Repository errors:** File I/O problems (propagated from repository)
+
+**Example:**
+
+```java
+try {
+    service.agregarGasto("", "Motivo", LocalDate.now(), new BigDecimal("10"));
+} catch (GastoException e) {
+    System.err.println("Error: " + e.getMessage());
+    // Output: Error: El título del gasto no puede estar vacío
+}
+```
+
+## Dependencies
+
+- `GastoRepository` - Data access interface
+- `Gasto` - Domain model
+- `GastoException` - Business exception type
+- Java standard libraries: `UUID`, `LocalDate`, `BigDecimal`, `List`, `Comparator`

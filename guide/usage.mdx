@@ -1,0 +1,198 @@
+---
+title: Using the Console Interface
+description: Learn how to navigate and use the Gestión de Gastos console application
+---
+
+## Overview
+
+The Gestión de Gastos application provides an interactive console-based interface for managing your expenses. When you start the application, you'll interact with it through a menu-driven system that guides you through various operations.
+
+## Starting the Application
+
+When you launch the application, you'll see the welcome banner:
+
+```
+==================================================
+   BIENVENIDO A LA GESTIÓN DE GASTOS DE MIBANCO
+==================================================
+```
+
+After the welcome message, the main menu will appear automatically.
+
+## Main Menu Navigation
+
+<Steps>
+  <Step title="View the Menu">
+    The main menu displays six options:
+    
+    ```
+    --- MENÚ PRINCIPAL ---
+    1. Agregar gasto
+    2. Actualizar gasto
+    3. Eliminar gasto
+    4. Listar todos los gastos
+    5. Filtrar gastos por mes
+    6. Salir
+    Seleccione una opción:
+    ```
+  </Step>
+
+  <Step title="Select an Option">
+    Type the number corresponding to your desired action (1-6) and press Enter.
+  </Step>
+
+  <Step title="Follow the Prompts">
+    The application will guide you through the necessary steps for your selected operation.
+  </Step>
+
+  <Step title="Return to Menu">
+    After completing an operation, the main menu will display again automatically.
+  </Step>
+</Steps>
+
+## Input Guidelines
+
+### Valid Option Selection
+
+The application expects a numeric input between 1 and 6. If you enter an invalid option:
+
+```
+Error. Por favor, ingrese un número válido para la opción del menú
+```
+
+<Note>
+You must enter a valid integer. Non-numeric input will result in an error message.
+</Note>
+
+### Canceling Operations
+
+For update and delete operations, you can cancel at any time:
+
+- Type `0` when prompted for an ID to cancel the operation
+- For delete operations, type anything other than `S` when asked for confirmation
+
+```
+Ingrese el ID (8 caracteres) del gasto (o '0' para cancelar):
+```
+
+## Understanding Expense IDs
+
+The system displays expenses with a shortened 8-character ID for convenience:
+
+```java
+// From Gasto.java toString() method
+[8762c7b5] 2026-03-03 | Matrícula universitaria | Pago ciclo 2026-I | S/ 1500.50
+```
+
+<Note>
+Internally, the application uses full UUIDs (e.g., `8762c7b5-30bc-48cd-9fcd-5f7f3fa778be`), but only the first 8 characters are shown and required for user operations.
+</Note>
+
+## Working with the ID System
+
+The application includes intelligent ID matching that allows you to use shortened IDs:
+
+```java
+// From GastoService.java
+private UUID obtenerUUIDPorIdCorto(String idCorto) {
+    if (idCorto == null || idCorto.length() < 8) {
+        throw new GastoException("Debe ingresar al menos los primeros 8 caracteres del ID");
+    }
+    // Finds matching expenses by ID prefix
+}
+```
+
+<Warning>
+If your shortened ID matches multiple expenses, you'll need to provide more characters:
+```
+El ID ingresado coincide con múltiples gastos. Ingrese más caracteres
+```
+</Warning>
+
+## Error Handling
+
+The application provides clear error messages for common issues:
+
+<Accordion title="Validation Errors">
+  ```
+  Error de validación: El título del gasto no puede estar vacío
+  Error de validación: El monto del gasto debe ser mayor a cero
+  ```
+  
+  These errors occur when business rules defined in `GastoService.java` are violated.
+</Accordion>
+
+<Accordion title="Format Errors">
+  ```
+  Error. Por favor, ingrese un número válido para la opción del menú
+  Formato de fecha incorrecto, use AAAA-MM-DD (ejemplo: 2026-03-02)
+  Monto inválido. Ingrese un número válido (ejemplo: 120.50)
+  ```
+  
+  These errors occur when input doesn't match the expected format.
+</Accordion>
+
+<Accordion title="Not Found Errors">
+  ```
+  No se encontró ningún gasto que coincida con el ID proporcionado
+  ```
+  
+  This occurs when the provided ID doesn't match any existing expense.
+</Accordion>
+
+## Exiting the Application
+
+To exit the application safely:
+
+1. Select option `6` from the main menu
+2. You'll see a goodbye message:
+   ```
+   Gracias por usar el sistema de Gestión de Gastos de Mibanco!
+   ```
+3. The application will close gracefully
+
+<Note>
+All data is automatically saved to `gastos.json` after each operation, so you don't need to manually save before exiting.
+</Note>
+
+## Console Session Example
+
+Here's a typical console session:
+
+```
+==================================================
+   BIENVENIDO A LA GESTIÓN DE GASTOS DE MIBANCO
+==================================================
+
+--- MENÚ PRINCIPAL ---
+1. Agregar gasto
+2. Actualizar gasto
+3. Eliminar gasto
+4. Listar todos los gastos
+5. Filtrar gastos por mes
+6. Salir
+Seleccione una opción: 4
+
+--- LISTA DE GASTOS ---
+[8762c7b5] 2026-03-03 | Matrícula universitaria | Pago ciclo 2026-I | S/ 1500.50
+[797deabe] 2026-03-01 | Pago de internet | Servicio mensual marzo | S/ 50.00
+[9b71444e] 2026-02-28 | Compra supermercado | Alimentos última semana de Febrero | S/ 245.30
+
+--- MENÚ PRINCIPAL ---
+1. Agregar gasto
+2. Actualizar gasto
+3. Eliminar gasto
+4. Listar todos los gastos
+5. Filtrar gastos por mes
+6. Salir
+Seleccione una opción: 6
+Gracias por usar el sistema de Gestión de Gastos de Mibanco!
+```
+
+## Tips for Efficient Use
+
+- **Keep IDs handy**: When viewing the expense list, note the 8-character IDs of expenses you want to modify
+- **Use list before update/delete**: Always list expenses first to get the correct ID
+- **Date format**: Remember the format `AAAA-MM-DD` (Year-Month-Day)
+- **Decimal amounts**: Use a period (.) for decimal separation, not a comma
+- **Optional fields**: The "motivo" (reason) field is optional - press Enter to skip it

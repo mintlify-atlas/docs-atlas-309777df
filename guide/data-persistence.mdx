@@ -1,0 +1,511 @@
+---
+title: Data Persistence
+description: Understanding how expense data is stored and managed using JSON files and Jackson
+---
+
+## Overview
+
+The Gestión de Gastos application uses file-based persistence with JSON format. All expense data is stored in a single `gastos.json` file using the Jackson library for serialization and deserialization.
+
+## File Location
+
+The data file is stored in the application's working directory:
+
+```java
+// From FileGastoRepository.java:18
+private static final String RUTA_ARCHIVO = "gastos.json";
+```
+
+<Note>
+The file `gastos.json` is created in the same directory where you run the application.
+</Note>
+
+## JSON File Structure
+
+The data file contains an array of expense objects, each with five fields:
+
+```json
+[ {
+  "id" : "8762c7b5-30bc-48cd-9fcd-5f7f3fa778be",
+  "titulo" : "Matrícula universitaria",
+  "motivo" : "Pago ciclo 2026-I",
+  "fecha" : "2026-03-03",
+  "monto" : 1500.50
+}, {
+  "id" : "e103a305-94ed-416f-a14f-7e55a4d68b28",
+  "titulo" : "Compra de libros",
+  "motivo" : "Material de estudio",
+  "fecha" : "2026-02-05",
+  "monto" : 80.50
+}, {
+  "id" : "797deabe-65af-4178-9150-f677235f2d5e",
+  "titulo" : "Pago de internet",
+  "motivo" : "Servicio mensual marzo",
+  "fecha" : "2026-03-01",
+  "monto" : 50.00
+} ]
+```
+
+### Field Descriptions
+
+| Field | Type | Description | Example | Required |
+|-------|------|-------------|---------|----------|
+| `id` | UUID String | Unique identifier (UUID v4) | `"8762c7b5-30bc-48cd-9fcd-5f7f3fa778be"` | Yes |
+| `titulo` | String | Expense title/name | `"Matrícula universitaria"` | Yes |
+| `motivo` | String | Reason or description | `"Pago ciclo 2026-I"` | No |
+| `fecha` | Date String | Date in ISO format (YYYY-MM-DD) | `"2026-03-03"` | Yes |
+| `monto` | Decimal | Amount with 2 decimal places | `1500.50` | Yes |
+
+## Jackson Configuration
+
+The application uses Jackson ObjectMapper with the JavaTimeModule for handling Java 8 date/time types.
+
+### ObjectMapper Setup
+
+```java
+// From FileGastoRepository.java:21-24
+public FileGastoRepository() {
+    this.objectMapper = new ObjectMapper();
+    this.objectMapper.registerModule(new JavaTimeModule());
+}
+```
+
+<Note>
+The `JavaTimeModule` is essential for serializing and deserializing `LocalDate` objects correctly.
+</Note>
+
+### Date Format Configuration
+
+The `Gasto` model uses Jackson annotations to control date formatting:
+
+```java
+// From Gasto.java:15-16
+@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+private LocalDate fecha;
+```
+
+This annotation ensures dates are stored in ISO 8601 format (`YYYY-MM-DD`).
+
+## Persistence Operations
+
+The repository implements five core operations that interact with the JSON file.
+
+### 1. Reading from File
+
+```java
+// From FileGastoRepository.java:27-38
+private List<Gasto> loadFromFile() {
+    File file = new File(RUTA_ARCHIVO);
+    if (!file.exists() || file.length() == 0) {
+        return new ArrayList<>();
+    }
+    try {
+        return objectMapper.readValue(file, new TypeReference<List<Gasto>>() {
+        });
+    } catch (IOException e) {
+        throw new GastoException("Error al leer el archivo de gastos: " + e.getMessage());
+    }
+}
+```
+
+<Accordion title="How It Works">
+  <Steps>
+    <Step title="Check File Existence">
+      If the file doesn't exist or is empty, return an empty list.
+    </Step>
+    <Step title="Deserialize JSON">
+      Use Jackson's `TypeReference` to deserialize the JSON array into a `List<Gasto>`.
+    </Step>
+    <Step title="Error Handling">
+      Catch any `IOException` and wrap it in a `GastoException` with a descriptive message.
+    </Step>
+  </Steps>
+</Accordion>
+
+### 2. Writing to File
+
+```java
+// From FileGastoRepository.java:41-47
+private void saveToFile(List<Gasto> gastos) {
+    try {
+        objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(RUTA_ARCHIVO), gastos);
+    } catch (IOException e) {
+        throw new GastoException("Error al guardar en el archivo de gastos: " + e.getMessage());
+    }
+}
+```
+
+<Note>
+The `writerWithDefaultPrettyPrinter()` method formats the JSON with proper indentation, making it human-readable.
+</Note>
+
+### 3. Find All Expenses
+
+```java
+// From FileGastoRepository.java:50-52
+@Override
+public List<Gasto> findAll() {
+    return loadFromFile();
+}
+```
+
+Simply reads and returns all expenses from the file.
+
+### 4. Find by ID
+
+```java
+// From FileGastoRepository.java:55-59
+@Override
+public Optional<Gasto> findById(UUID id) {
+    return findAll().stream()
+            .filter(gasto -> gasto.getId().equals(id))
+            .findFirst();
+}
+```
+
+<Note>
+Returns an `Optional<Gasto>` to safely handle cases where the ID doesn't exist.
+</Note>
+
+### 5. Save New Expense
+
+```java
+// From FileGastoRepository.java:62-66
+@Override
+public void save(Gasto gasto) {
+    List<Gasto> gastos = loadFromFile();
+    gastos.add(gasto);
+    saveToFile(gastos);
+}
+```
+
+<Steps>
+  <Step title="Load Current Data">
+    Read all existing expenses from the file.
+  </Step>
+  <Step title="Add New Expense">
+    Append the new expense to the list.
+  </Step>
+  <Step title="Persist Changes">
+    Write the updated list back to the file.
+  </Step>
+</Steps>
+
+### 6. Update Existing Expense
+
+```java
+// From FileGastoRepository.java:69-78
+@Override
+public void update(Gasto gastoActualizado) {
+    List<Gasto> gastos = loadFromFile();
+    for (int i = 0; i < gastos.size(); i++) {
+        if (gastos.get(i).getId().equals(gastoActualizado.getId())) {
+            gastos.set(i, gastoActualizado);
+            saveToFile(gastos);
+            return;
+        }
+    }
+}
+```
+
+Finds the expense by ID and replaces it with the updated version.
+
+### 7. Delete by ID
+
+```java
+// From FileGastoRepository.java:81-87
+@Override
+public void deleteById(UUID id) {
+    List<Gasto> gastos = loadFromFile();
+    boolean eliminado = gastos.removeIf(gasto -> gasto.getId().equals(id));
+    if (eliminado) {
+        saveToFile(gastos);
+    }
+}
+```
+
+<Note>
+Only writes to the file if an expense was actually deleted, avoiding unnecessary I/O operations.
+</Note>
+
+## Data Model
+
+The `Gasto` class represents a single expense and includes automatic rounding logic.
+
+### Complete Model
+
+```java
+// From Gasto.java
+package com.mibanco.gastos.model;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.util.UUID;
+
+public class Gasto {
+
+    private UUID id;
+    private String titulo;
+    private String motivo;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    private LocalDate fecha;
+
+    private BigDecimal monto;
+
+    // Constructors, getters, and setters...
+
+    // 2 decimales como redondeo comercial
+    public void setMonto(BigDecimal monto) {
+        if (monto != null) {
+            this.monto = monto.setScale(2, RoundingMode.HALF_UP);
+        }
+    }
+
+    @Override
+    public String toString() {
+        return String.format("[%s] %s | %s | %s | S/ %s",
+                id.toString().substring(0, 8),
+                fecha,
+                titulo,
+                motivo,
+                monto);
+    }
+}
+```
+
+### Automatic Rounding
+
+All monetary amounts are automatically rounded to 2 decimal places using `HALF_UP` rounding mode:
+
+```java
+// From Gasto.java:68-72
+public void setMonto(BigDecimal monto) {
+    if (monto != null) {
+        this.monto = monto.setScale(2, RoundingMode.HALF_UP);
+    }
+}
+```
+
+<Accordion title="Rounding Examples">
+  | Input | Output | Explanation |
+  |-------|--------|-------------|
+  | 1500.5 | 1500.50 | Adds trailing zero |
+  | 80.555 | 80.56 | Rounds up (5 or higher) |
+  | 50.554 | 50.55 | Rounds down (less than 5) |
+  | 95.2 | 95.20 | Adds trailing zero |
+  | 245.3456 | 245.35 | Rounds to 2 decimals |
+</Accordion>
+
+## File Lifecycle
+
+### Initial State
+
+When the application starts for the first time, the `gastos.json` file doesn't exist. The first time you add an expense, the file is created automatically.
+
+```java
+// From FileGastoRepository.java:28-30
+File file = new File(RUTA_ARCHIVO);
+if (!file.exists() || file.length() == 0) {
+    return new ArrayList<>();
+}
+```
+
+### Read-Modify-Write Pattern
+
+Every operation follows this pattern:
+
+<Steps>
+  <Step title="Read">
+    Load all expenses from `gastos.json` into memory.
+  </Step>
+  <Step title="Modify">
+    Perform the operation (add, update, or delete).
+  </Step>
+  <Step title="Write">
+    Save the entire list back to the file with pretty printing.
+  </Step>
+</Steps>
+
+<Warning>
+This pattern means the entire file is rewritten on every operation. For large datasets, consider a database instead.
+</Warning>
+
+## Error Handling
+
+The repository includes comprehensive error handling for file operations:
+
+```java
+// From FileGastoRepository.java
+catch (IOException e) {
+    throw new GastoException("Error al leer el archivo de gastos: " + e.getMessage());
+}
+```
+
+### Common Error Scenarios
+
+<Accordion title="File Read Errors">
+  **Cause:** File is corrupted, has invalid JSON, or permission issues.
+  
+  **Message:** `Error al leer el archivo de gastos: [details]`
+  
+  **Solution:** Check file permissions and JSON validity.
+</Accordion>
+
+<Accordion title="File Write Errors">
+  **Cause:** Disk is full, no write permissions, or file is locked.
+  
+  **Message:** `Error al guardar en el archivo de gastos: [details]`
+  
+  **Solution:** Check disk space and file permissions.
+</Accordion>
+
+## Pretty Printing
+
+The JSON file is formatted with indentation for readability:
+
+```java
+// From FileGastoRepository.java:43
+objectMapper.writerWithDefaultPrettyPrinter().writeValue(new File(RUTA_ARCHIVO), gastos);
+```
+
+This produces formatted output like:
+
+```json
+[ {
+  "id" : "8762c7b5-30bc-48cd-9fcd-5f7f3fa778be",
+  "titulo" : "Matrícula universitaria",
+  "motivo" : "Pago ciclo 2026-I",
+  "fecha" : "2026-03-03",
+  "monto" : 1500.50
+} ]
+```
+
+Instead of compact output:
+
+```json
+[{"id":"8762c7b5-30bc-48cd-9fcd-5f7f3fa778be","titulo":"Matrícula universitaria","motivo":"Pago ciclo 2026-I","fecha":"2026-03-03","monto":1500.50}]
+```
+
+## Manual File Editing
+
+You can manually edit `gastos.json` if needed, but follow these guidelines:
+
+<Warning>
+**Important Rules:**
+- Always close the application before editing the file
+- Maintain valid JSON syntax (use a JSON validator)
+- Keep the date format as `YYYY-MM-DD`
+- Use valid UUID v4 format for IDs
+- Ensure amounts have at most 2 decimal places
+- Don't forget commas between objects
+</Warning>
+
+### Example Manual Entry
+
+```json
+{
+  "id" : "a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d",
+  "titulo" : "New Expense",
+  "motivo" : "Manual entry",
+  "fecha" : "2026-03-09",
+  "monto" : 99.99
+}
+```
+
+## Data Backup
+
+Since all data is in a single file, backing up is simple:
+
+<Steps>
+  <Step title="Close the Application">
+    Ensure no write operations are in progress.
+  </Step>
+  <Step title="Copy the File">
+    ```bash
+    cp gastos.json gastos_backup_2026-03-09.json
+    ```
+  </Step>
+  <Step title="Store Safely">
+    Move the backup to a secure location.
+  </Step>
+</Steps>
+
+<Note>
+Consider creating automatic backups before major operations or on a schedule.
+</Note>
+
+## Migration Considerations
+
+If you need to migrate to a database later, the current structure maps well to a table:
+
+```sql
+CREATE TABLE gastos (
+    id UUID PRIMARY KEY,
+    titulo VARCHAR(255) NOT NULL,
+    motivo TEXT,
+    fecha DATE NOT NULL,
+    monto DECIMAL(10, 2) NOT NULL
+);
+```
+
+The repository interface (`GastoRepository`) makes it easy to swap implementations without changing the service layer.
+
+## Performance Characteristics
+
+### Time Complexity
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| Find All | O(n) | Reads entire file |
+| Find by ID | O(n) | Linear search through list |
+| Save | O(n) | Writes entire file |
+| Update | O(n) | Finds item, writes entire file |
+| Delete | O(n) | Filters list, writes entire file |
+
+<Note>
+**n** = number of expenses in the file
+</Note>
+
+### Space Complexity
+
+- **Memory:** O(n) - entire dataset loaded into memory
+- **Disk:** File size grows linearly with number of expenses
+
+### Scalability Limits
+
+<Warning>
+This file-based approach is suitable for:
+- Personal use (dozens to hundreds of expenses)
+- Single-user applications
+- Development and testing
+
+**Not suitable for:**
+- Multi-user environments (no concurrent access control)
+- Large datasets (thousands of records)
+- High-frequency operations (entire file rewritten each time)
+</Warning>
+
+## Thread Safety
+
+<Warning>
+**The current implementation is NOT thread-safe.** If multiple instances of the application run simultaneously or if the same instance handles concurrent operations, data corruption may occur.
+
+For production use with concurrency requirements, implement file locking or migrate to a database.
+</Warning>
+
+## Summary
+
+The data persistence layer provides:
+
+- Simple JSON file storage in `gastos.json`
+- Jackson-based serialization with pretty printing
+- Automatic date formatting (ISO 8601)
+- Automatic amount rounding (2 decimals, HALF_UP)
+- Comprehensive error handling
+- Easy backup and recovery
+- Clear separation of concerns through repository pattern
+
+This approach balances simplicity with functionality, making it ideal for small-scale applications while providing a clean foundation for future scalability improvements.

@@ -1,97 +1,98 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Gestión de Gastos Mibanco"
+description: "Java console application for personal expense management with financial precision"
 ---
 
-## Setting up
+<Note>
+This project was developed as a technical challenge solution for the Software Engineering Internship position at Mibanco.
+</Note>
 
-Get your documentation site up and running in minutes.
+## What is Gestión de Gastos?
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Gestión de Gastos is a robust console application built with **Java 17** that enables personal expense tracking with financial precision. It provides complete CRUD operations, JSON file persistence, and follows clean architecture principles.
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Get Started" icon="rocket" href="/installation">
+    Install and run the application in minutes
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="User Guide" icon="book-open" href="/guide/usage">
+    Learn how to manage your expenses effectively
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Architecture" icon="building" href="/architecture/overview">
+    Understand the layered architecture design
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="API Reference" icon="code" href="/api/gasto-service">
+    Explore the service and repository APIs
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Complete CRUD Operations" icon="database">
+    Create, read, update, and delete expenses with validation
+  </Card>
+  <Card title="Financial Precision" icon="calculator">
+    BigDecimal with HALF_UP rounding ensures accurate monetary calculations
+  </Card>
+  <Card title="JSON Persistence" icon="file-code">
+    Automatic data persistence using Jackson library
+  </Card>
+  <Card title="Smart Filtering" icon="filter">
+    Filter expenses by month and year with chronological sorting
+  </Card>
+  <Card title="Short ID Support" icon="fingerprint">
+    Use first 8 characters of UUID for easier identification
+  </Card>
+  <Card title="Clean Architecture" icon="layer-group">
+    Layered structure following SOLID principles
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Quick Example
 
-## Need inspiration?
+Here's a glimpse of the console interface:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
+```bash
+==================================================
+   BIENVENIDO A LA GESTIÓN DE GASTOS DE MIBANCO
+==================================================
+
+--- MENÚ PRINCIPAL ---
+1. Agregar gasto
+2. Actualizar gasto
+3. Eliminar gasto
+4. Listar todos los gastos
+5. Filtrar gastos por mes
+6. Salir
+Seleccione una opción:
+```
+
+## Technology Stack
+
+<CardGroup cols={3}>
+  <Card title="Java 17" icon="java">
+    Modern Java features and APIs
+  </Card>
+  <Card title="Maven" icon="box">
+    Dependency management
+  </Card>
+  <Card title="Jackson" icon="brackets-curly">
+    JSON serialization
+  </Card>
+  <Card title="JUnit 5" icon="vial">
+    Unit testing framework
+  </Card>
+  <Card title="GitHub Actions" icon="github">
+    Continuous Integration
+  </Card>
+  <Card title="BigDecimal" icon="coins">
+    Precise financial calculations
+  </Card>
+</CardGroup>
+
+## Ready to Get Started?
+
+<Card title="Installation Guide" icon="download" href="/installation" horizontal>
+  Follow the step-by-step installation guide to set up the application
 </Card>

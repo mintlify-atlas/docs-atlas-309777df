@@ -1,0 +1,206 @@
+---
+title: Architecture Overview
+description: High-level overview of the Gestión de Gastos Mibanco architecture and design principles
+---
+
+## Introduction
+
+The Gestión de Gastos Mibanco application follows a **layered architecture** (Clean Code principles) that ensures clear separation of concerns, maintainability, and testability. The system is designed around the **Single Responsibility Principle (SRP)** with dependency injection to facilitate unit testing.
+
+<Note>
+This architecture was designed for a technical challenge for the Software Engineering Internship position at Mibanco, demonstrating professional-grade Java development practices.
+</Note>
+
+## Architectural Diagram
+
+The application is structured in four distinct layers, each with specific responsibilities:
+
+```
+┌─────────────────────────────────────────────┐
+│           UI Layer (Consola)                │
+│  - Console interface                        │
+│  - User input validation                    │
+│  - Menu navigation                          │
+└──────────────┬──────────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────────┐
+│       Service Layer (GastoService)          │
+│  - Business logic                           │
+│  - Validation rules                         │
+│  - Data transformation                      │
+└──────────────┬──────────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────────┐
+│   Repository Layer (GastoRepository)        │
+│  - Data access contract (interface)         │
+│  - File implementation                      │
+│  - JSON persistence                         │
+└──────────────┬──────────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────────┐
+│        Model Layer (Gasto)                  │
+│  - Domain entities                          │
+│  - Data structures                          │
+│  - Value objects                            │
+└─────────────────────────────────────────────┘
+```
+
+## Layer Responsibilities
+
+<CardGroup cols={2}>
+  <Card title="Model Layer" icon="cube">
+    Domain entities and data structures. The `Gasto` class represents the core business entity with financial precision using `BigDecimal`.
+  </Card>
+  
+  <Card title="Repository Layer" icon="database">
+    Data persistence abstraction. The `GastoRepository` interface defines the contract, while `FileGastoRepository` implements JSON file storage using Jackson.
+  </Card>
+  
+  <Card title="Service Layer" icon="gears">
+    Business logic and validation. `GastoService` enforces business rules, validates data, and orchestrates repository operations.
+  </Card>
+  
+  <Card title="UI Layer" icon="terminal">
+    User interaction through console. The `Consola` class manages menu navigation, user input, and displays formatted output.
+  </Card>
+</CardGroup>
+
+## Core Design Principles
+
+### Dependency Injection
+
+The application uses **constructor-based dependency injection** to enable testability and loose coupling:
+
+```java
+public class GastoService {
+    private final GastoRepository repository;
+
+    // Dependency injection through constructor
+    public GastoService(GastoRepository repository) {
+        this.repository = repository;
+    }
+}
+```
+
+This design allows the service layer to work with any repository implementation, making it easy to:
+- Swap implementations (e.g., file storage to database)
+- Create fake repositories for testing
+- Mock dependencies in unit tests
+
+### Interface-Based Contracts
+
+The repository layer uses interfaces to define contracts:
+
+```java
+public interface GastoRepository {
+    List<Gasto> findAll();
+    Optional<Gasto> findById(UUID id);
+    void save(Gasto gasto);
+    void update(Gasto gasto);
+    void deleteById(UUID id);
+}
+```
+
+This abstraction enables:
+- Multiple implementations (currently `FileGastoRepository`)
+- Easy testing with fake implementations
+- Future extensibility (database, cloud storage, etc.)
+
+### Single Responsibility Principle
+
+Each layer has a clearly defined responsibility:
+
+- **Model**: Represents domain entities
+- **Repository**: Handles data persistence
+- **Service**: Implements business logic and validation
+- **UI**: Manages user interaction
+
+<Note>
+The separation of concerns ensures that changes in one layer don't ripple through the entire application, making the codebase more maintainable and easier to test.
+</Note>
+
+## Technology Stack
+
+| Component | Technology | Purpose |
+|-----------|-----------|---------|
+| **Language** | Java 17 | Modern Java features including Records, Pattern Matching, and enhanced APIs |
+| **Build Tool** | Maven | Dependency management and build automation |
+| **JSON Processing** | Jackson 2.15.2 | Serialization/deserialization with `jackson-databind` and `jackson-datatype-jsr310` |
+| **Date/Time** | `java.time` API | Modern, immutable date handling with `LocalDate` |
+| **Precision Math** | `BigDecimal` | Financial calculations with exact decimal precision |
+| **Testing** | JUnit 5 | Unit testing framework with modern annotations and assertions |
+| **CI/CD** | GitHub Actions | Automated testing and continuous integration |
+
+## Data Flow
+
+The typical data flow for a CRUD operation follows this pattern:
+
+1. **User Input** → UI Layer captures and validates format
+2. **Service Invocation** → UI calls appropriate service method
+3. **Business Validation** → Service layer validates business rules
+4. **Repository Operation** → Service delegates persistence to repository
+5. **File Persistence** → Repository serializes data to JSON using Jackson
+6. **Response** → Success/error flows back through layers to user
+
+Example flow for adding a new expense:
+
+```
+User enters expense data
+       ↓
+Consola.agregarGasto() validates format
+       ↓
+GastoService.agregarGasto() validates business rules
+       ↓
+Creates new Gasto with UUID
+       ↓
+FileGastoRepository.save() persists to JSON
+       ↓
+Success message displayed to user
+```
+
+## Error Handling Strategy
+
+The application uses a custom exception hierarchy to handle errors gracefully:
+
+```java
+public class GastoException extends RuntimeException {
+    public GastoException(String mensaje) {
+        super(mensaje);
+    }
+}
+```
+
+Exceptions are caught at the UI layer to prevent application crashes and provide user-friendly error messages. See [Exception Handling](/architecture/technical-decisions) for details.
+
+## Key Architectural Benefits
+
+<Accordion title="Testability">
+  Dependency injection and interface-based design enable comprehensive unit testing. The test suite uses fake repository implementations to isolate business logic from file I/O operations.
+</Accordion>
+
+<Accordion title="Maintainability">
+  Clear separation of concerns means changes in one layer don't affect others. For example, switching from file storage to a database only requires implementing a new repository class.
+</Accordion>
+
+<Accordion title="Extensibility">
+  The modular design makes it easy to add new features. New repository implementations, additional validation rules, or alternative UI interfaces can be added without modifying existing code.
+</Accordion>
+
+<Accordion title="Reliability">
+  Custom exception handling and financial-grade precision (BigDecimal) ensure the application behaves predictably and handles edge cases gracefully.
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Layered Structure" icon="layer-group" href="/architecture/layered-structure">
+    Explore each layer in detail with code examples
+  </Card>
+  
+  <Card title="Technical Decisions" icon="lightbulb" href="/architecture/technical-decisions">
+    Understand key technical decisions and their rationale
+  </Card>
+</CardGroup>

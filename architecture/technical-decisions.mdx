@@ -1,0 +1,598 @@
+---
+title: Technical Decisions
+description: Key technical decisions and their rationale in the Gestión de Gastos Mibanco architecture
+---
+
+## Introduction
+
+This document explains the critical technical decisions made during the development of the Gestión de Gastos Mibanco application, providing the rationale behind each choice and demonstrating how they contribute to the application's robustness, maintainability, and reliability.
+
+## BigDecimal for Financial Precision
+
+### Decision
+
+Use `java.math.BigDecimal` instead of `double` or `float` for representing monetary amounts.
+
+### Rationale
+
+Floating-point types (`float` and `double`) use binary approximation, which leads to precision errors in decimal arithmetic:
+
+```java
+// ❌ WRONG: Using double for money
+double price = 0.1;
+double qty = 0.2;
+System.out.println(price + qty); // Outputs: 0.30000000000000004
+
+// ✅ CORRECT: Using BigDecimal
+BigDecimal price = new BigDecimal("0.1");
+BigDecimal qty = new BigDecimal("0.2");
+System.out.println(price.add(qty)); // Outputs: 0.3
+```
+
+### Implementation
+
+Located at `src/main/java/com/mibanco/gastos/model/Gasto.java:68-72`
+
+```java
+public void setMonto(BigDecimal monto) {
+    if (monto != null) {
+        // Automatically rounds to 2 decimal places using HALF_UP
+        this.monto = monto.setScale(2, RoundingMode.HALF_UP);
+    }
+}
+```
+
+### Key Benefits
+
+<CardGroup cols={2}>
+  <Card title="Exact Precision" icon="crosshairs">
+    `BigDecimal` provides exact decimal arithmetic, critical for financial applications where precision errors are unacceptable.
+  </Card>
+  
+  <Card title="Automatic Rounding" icon="circle-half-stroke">
+    The setter automatically applies commercial rounding (`HALF_UP`) to 2 decimal places, ensuring consistency across all monetary values.
+  </Card>
+</CardGroup>
+
+<Note>
+`RoundingMode.HALF_UP` is the standard commercial rounding mode: values at or above 0.5 round up, others round down. For example: 1.125 → 1.13, 1.124 → 1.12
+</Note>
+
+### Usage Example
+
+From `GastoServiceTest.java:31-46`:
+
+```java
+@Test
+void debeCrearGastoUniversitarioValido() {
+    String titulo = "Matrícula universitaria";
+    String motivo = "Pago ciclo 2026-I";
+    LocalDate fecha = LocalDate.now();
+    BigDecimal monto = new BigDecimal("1500.50");
+
+    gastoService.agregarGasto(titulo, motivo, fecha, monto);
+
+    assertEquals(1, falsoRepository.gastos.size());
+    Gasto guardado = falsoRepository.gastos.get(0);
+    assertEquals(titulo, guardado.getTitulo());
+    assertEquals(new BigDecimal("1500.50"), guardado.getMonto());
+}
+```
+
+## UUID Strategy for Entity Identification
+
+### Decision
+
+Use `java.util.UUID` for generating unique expense identifiers instead of sequential integer IDs.
+
+### Rationale
+
+UUIDs provide globally unique identifiers without requiring a centralized ID generator:
+
+- **Uniqueness**: Virtually impossible to generate duplicates (collision probability: ~1 in 10³⁸)
+- **Distribution**: Can be generated independently without coordination
+- **Security**: Not predictable like sequential IDs
+- **Scalability**: Works across distributed systems
+
+### Implementation
+
+From `GastoService.java:25`:
+
+```java
+public void agregarGasto(String titulo, String motivo, 
+                        LocalDate fecha, BigDecimal monto) {
+    validarDatosGasto(titulo, fecha, monto);
+    
+    // Generate random UUID for new expense
+    Gasto nuevoGasto = new Gasto(UUID.randomUUID(), 
+        titulo, motivo, fecha, monto);
+    repository.save(nuevoGasto);
+}
+```
+
+### User-Friendly ID Lookup
+
+Full UUIDs are verbose (36 characters: `550e8400-e29b-41d4-a716-446655440000`), so the application implements short ID matching for better UX:
+
+From `GastoService.java:86-104`:
+
+```java
+private UUID obtenerUUIDPorIdCorto(String idCorto) {
+    if (idCorto == null || idCorto.length() < 8) {
+        throw new GastoException(
+            "Debe ingresar al menos los primeros 8 caracteres del ID");
+    }
+    
+    List<UUID> coincidencias = repository.findAll().stream()
+            .map(Gasto::getId)
+            .filter(id -> id.toString().startsWith(idCorto))
+            .toList();
+    
+    if (coincidencias.isEmpty()) {
+        throw new GastoException(
+            "No se encontró ningún gasto que coincida con el ID proporcionado");
+    }
+    if (coincidencias.size() > 1) {
+        throw new GastoException(
+            "El ID ingresado coincide con múltiples gastos. " +
+            "Ingrese más caracteres");
+    }
+    
+    return coincidencias.get(0);
+}
+```
+
+Users can reference expenses by the first 8 characters:
+```
+Full UUID:  550e8400-e29b-41d4-a716-446655440000
+Short ID:   550e8400
+```
+
+The system validates uniqueness and prompts for more characters if ambiguous.
+
+## Jackson Configuration for JSON Persistence
+
+### Decision
+
+Use Jackson (`jackson-databind` + `jackson-datatype-jsr310`) for JSON serialization with LocalDate support.
+
+### Rationale
+
+Jackson is the industry-standard JSON library for Java, offering:
+- High performance
+- Rich feature set (annotations, modules, custom serializers)
+- Excellent `java.time` support through `jackson-datatype-jsr310`
+- Pretty-printing for human-readable JSON files
+
+### Configuration
+
+From `FileGastoRepository.java:21-24`:
+
+```java
+public FileGastoRepository() {
+    this.objectMapper = new ObjectMapper();
+    // Register module for LocalDate serialization/deserialization
+    this.objectMapper.registerModule(new JavaTimeModule());
+}
+```
+
+### LocalDate Formatting
+
+From `Gasto.java:15-16`:
+
+```java
+@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+private LocalDate fecha;
+```
+
+This annotation ensures dates are serialized as readable strings:
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "titulo": "Matrícula universitaria",
+  "motivo": "Pago ciclo 2026-I",
+  "fecha": "2026-03-09",
+  "monto": 1500.50
+}
+```
+
+Without `JavaTimeModule`, `LocalDate` would fail to serialize or produce unreadable numeric arrays.
+
+### Pretty Printing
+
+From `FileGastoRepository.java:42-46`:
+
+```java
+private void saveToFile(List<Gasto> gastos) {
+    try {
+        objectMapper.writerWithDefaultPrettyPrinter()
+                   .writeValue(new File(RUTA_ARCHIVO), gastos);
+    } catch (IOException e) {
+        throw new GastoException(
+            "Error al guardar en el archivo de gastos: " + e.getMessage());
+    }
+}
+```
+
+This produces human-readable JSON with proper indentation:
+
+```json
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "titulo": "Matrícula universitaria",
+    "motivo": "Pago ciclo 2026-I",
+    "fecha": "2026-03-09",
+    "monto": 1500.50
+  }
+]
+```
+
+## Dependency Injection Pattern
+
+### Decision
+
+Use constructor-based dependency injection instead of field injection or concrete class instantiation.
+
+### Rationale
+
+Constructor injection provides:
+- **Immutability**: Dependencies are `final` and cannot be changed
+- **Testability**: Easy to provide mock/fake implementations
+- **Explicit dependencies**: Constructor signature clearly shows what's required
+- **Compile-time safety**: Missing dependencies cause compilation errors
+
+### Implementation
+
+From `GastoService.java:15-20`:
+
+```java
+public class GastoService {
+    private final GastoRepository repository;
+
+    // Constructor-based dependency injection for testability
+    public GastoService(GastoRepository repository) {
+        this.repository = repository;
+    }
+}
+```
+
+### Benefits for Testing
+
+From `GastoServiceTest.java:24-28`:
+
+```java
+@BeforeEach
+void setUp() {
+    falsoRepository = new FalsoGastoRepository();
+    // Inject fake repository for isolated testing
+    gastoService = new GastoService(falsoRepository);
+}
+```
+
+The fake repository implementation (`GastoServiceTest.java:123-151`) uses an in-memory `ArrayList` instead of file I/O:
+
+```java
+private static class FalsoGastoRepository implements GastoRepository {
+    final List<Gasto> gastos = new ArrayList<>();
+
+    @Override
+    public List<Gasto> findAll() {
+        return new ArrayList<>(gastos);
+    }
+
+    @Override
+    public void save(Gasto gasto) {
+        gastos.add(gasto);
+    }
+    
+    // ... other methods
+}
+```
+
+This enables:
+- **Fast tests**: No disk I/O
+- **Deterministic results**: No file system side effects
+- **Isolation**: Tests don't interfere with each other
+
+<Accordion title="Why not use frameworks like Spring?">
+  While Spring provides powerful dependency injection, this project intentionally uses **manual constructor injection** to:
+  - Keep dependencies minimal (no framework overhead)
+  - Demonstrate understanding of core DI principles
+  - Maintain simplicity for a console application
+  - Avoid over-engineering for the scope of the project
+</Accordion>
+
+## Exception Handling Strategy
+
+### Decision
+
+Create a custom `GastoException` for domain-specific errors instead of using generic Java exceptions.
+
+### Implementation
+
+From `GastoException.java:1-8`:
+
+```java
+package com.mibanco.gastos.exception;
+
+// Custom exception for business rule violations
+public class GastoException extends RuntimeException {
+    public GastoException(String mensaje) {
+        super(mensaje);
+    }
+}
+```
+
+### Rationale
+
+<CardGroup cols={2}>
+  <Card title="Semantic Clarity" icon="tag">
+    `GastoException` clearly indicates a domain-specific error, distinguishing business rule violations from technical errors.
+  </Card>
+  
+  <Card title="Centralized Handling" icon="filter">
+    The UI layer can catch `GastoException` specifically to display user-friendly messages without catching all exceptions.
+  </Card>
+</CardGroup>
+
+### Usage in Service Layer
+
+From `GastoService.java:73-83`:
+
+```java
+private void validarDatosGasto(String titulo, LocalDate fecha, 
+                               BigDecimal monto) {
+    if (titulo == null || titulo.trim().isEmpty()) {
+        throw new GastoException(
+            "El título del gasto no puede estar vacío");
+    }
+    if (fecha == null) {
+        throw new GastoException("La fecha del gasto es obligatoria");
+    }
+    if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
+        throw new GastoException(
+            "El monto del gasto debe ser mayor a cero");
+    }
+}
+```
+
+### Handling in UI Layer
+
+From `Consola.java:44-51`:
+
+```java
+try {
+    // ... menu logic
+} catch (NumberFormatException e) {
+    System.out.println("Error. Ingrese un número válido");
+} catch (GastoException e) {
+    // Catch domain exceptions for user-friendly error messages
+    System.out.println("Error de validación: " + e.getMessage());
+} catch (Exception e) {
+    System.out.println("Ocurrió un error inesperado: " + 
+        e.getMessage());
+}
+```
+
+This layered exception handling prevents application crashes while providing meaningful feedback to users.
+
+### Test Coverage
+
+From `GastoServiceTest.java:49-68`:
+
+```java
+@Test
+void noDebePermitirMontoNegativoOIgualAZero() {
+    String titulo = "Curso de programación";
+    LocalDate fecha = LocalDate.now();
+    BigDecimal montoNegativo = new BigDecimal("-100.00");
+    BigDecimal montoCero = BigDecimal.ZERO;
+
+    // Verify exception is thrown for negative amount
+    GastoException exceptionNegativo = assertThrows(GastoException.class, () -> {
+        gastoService.agregarGasto(titulo, "Pago de curso", fecha, montoNegativo);
+    });
+    assertTrue(exceptionNegativo.getMessage().contains("mayor a cero"));
+
+    // Verify exception is thrown for zero amount
+    assertThrows(GastoException.class, () -> {
+        gastoService.agregarGasto(titulo, "Pago de curso", fecha, montoCero);
+    });
+
+    assertTrue(falsoRepository.gastos.isEmpty());
+}
+```
+
+## Modern Java Features
+
+### Decision
+
+Target Java 17 and leverage modern language features.
+
+### Java 17 Features Used
+
+<Accordion title="Switch Expressions (Java 14+)">
+  From `Consola.java:32-43`:
+  
+  ```java
+  switch (opcion) {
+      case 1 -> agregarGasto();
+      case 2 -> actualizarGasto();
+      case 3 -> eliminarGasto();
+      case 4 -> listarGastos();
+      case 5 -> filtrarGastos();
+      case 6 -> {
+          salir = true;
+          System.out.println("Gracias por usar el sistema!");
+      }
+      default -> System.out.println("Opción no válida");
+  }
+  ```
+  
+  Arrow syntax (`->`) provides cleaner, more concise switch statements without fall-through issues.
+</Accordion>
+
+<Accordion title="Stream API (Java 8+)">
+  From `GastoService.java:56-69`:
+  
+  ```java
+  public List<Gasto> listarGastos() {
+      return repository.findAll().stream()
+              .sorted(Comparator.comparing(Gasto::getFecha).reversed())
+              .toList();
+  }
+
+  public List<Gasto> filtrarGastosPorMes(int mes, int anio) {
+      if (mes < 1 || mes > 12) {
+          throw new GastoException("El mes debe estar entre 1 y 12");
+      }
+      
+      return repository.findAll().stream()
+              .filter(gasto -> gasto.getFecha().getMonthValue() == mes 
+                      && gasto.getFecha().getYear() == anio)
+              .sorted(Comparator.comparing(Gasto::getFecha).reversed())
+              .toList();
+  }
+  ```
+  
+  Functional programming with streams provides declarative data transformation.
+</Accordion>
+
+<Accordion title="java.time API (Java 8+)">
+  From `Gasto.java:6,16`:
+  
+  ```java
+  import java.time.LocalDate;
+  
+  @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+  private LocalDate fecha;
+  ```
+  
+  `LocalDate` is immutable, thread-safe, and part of the modern `java.time` package, replacing the legacy `java.util.Date`.
+</Accordion>
+
+<Accordion title="Optional Type (Java 8+)">
+  From `GastoRepository.java:11`:
+  
+  ```java
+  Optional<Gasto> findById(UUID id);
+  ```
+  
+  `Optional<T>` explicitly indicates that a value may or may not be present, avoiding `null` pointer exceptions.
+</Accordion>
+
+<Accordion title="Type Inference with var (Java 10+)">
+  While not heavily used in this project to maintain clarity, Java 10's `var` keyword is available for local variable type inference.
+</Accordion>
+
+## Maven Dependency Management
+
+### Configuration
+
+From `pom.xml:11-42`:
+
+```xml
+<properties>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+</properties>
+
+<dependencies>
+    <!-- Jackson for JSON serialization -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.core</groupId>
+        <artifactId>jackson-databind</artifactId>
+        <version>2.15.2</version>
+    </dependency>
+    
+    <!-- Jackson module for java.time support -->
+    <dependency>
+        <groupId>com.fasterxml.jackson.datatype</groupId>
+        <artifactId>jackson-datatype-jsr310</artifactId>
+        <version>2.15.2</version>
+    </dependency>
+
+    <!-- JUnit 5 for unit testing -->
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>5.10.0</version>
+        <scope>test</scope>
+    </dependency>
+    <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-engine</artifactId>
+        <version>5.10.0</version>
+        <scope>test</scope>
+    </dependency>
+</dependencies>
+```
+
+### Rationale for Minimal Dependencies
+
+The project intentionally keeps dependencies minimal:
+
+<CardGroup cols={2}>
+  <Card title="Jackson" icon="file-code">
+    Industry-standard JSON library with excellent Java integration
+  </Card>
+  
+  <Card title="JUnit 5" icon="flask-vial">
+    Modern testing framework with powerful assertions and annotations
+  </Card>
+</CardGroup>
+
+**No framework overhead**: Unlike Spring Boot applications, this project avoids heavy frameworks, keeping the runtime lightweight and startup instant.
+
+## Summary of Technical Decisions
+
+| Decision | Technology | Rationale |
+|----------|-----------|-----------|
+| **Financial Precision** | `BigDecimal` with `HALF_UP` rounding | Exact decimal arithmetic for monetary values |
+| **Entity IDs** | `UUID` with short lookup | Global uniqueness + user-friendly interface |
+| **JSON Persistence** | Jackson with `JavaTimeModule` | Industry standard with `LocalDate` support |
+| **Dependency Injection** | Constructor-based DI | Testability, immutability, explicit dependencies |
+| **Exception Handling** | Custom `GastoException` | Domain-specific error semantics |
+| **Date/Time** | `java.time.LocalDate` | Modern, immutable date handling |
+| **Java Version** | Java 17 | LTS version with modern language features |
+| **Build Tool** | Maven | Standard dependency management |
+| **Testing** | JUnit 5 + Fake Objects | Fast, isolated, deterministic tests |
+
+## Development Practices
+
+### Code Quality
+
+- **Clean Code Principles**: Single Responsibility, clear naming, minimal comments
+- **SOLID Principles**: Dependency Inversion (repository interface), SRP (layered architecture)
+- **DRY**: Centralized validation in `validarDatosGasto()`
+
+### Testing Strategy
+
+From `README.md:57`:
+
+> "The project includes unit tests focused on the service layer (`GastoServiceTest`). To isolate tests from the real file system, the Fake Object pattern was implemented (in-memory repository), ensuring fast and deterministic tests."
+
+### AI-Assisted Development
+
+From `README.md:67-90`, the project transparently documents the use of GitHub Copilot as a development assistant:
+
+- **Verification**: Validating Maven configuration for Java 17, JUnit 5, and Jackson
+- **Best Practices**: Confirming `BigDecimal` usage with `RoundingMode.HALF_UP`
+- **Testing Structure**: Suggesting unit test patterns with fake repositories
+
+All AI suggestions were reviewed, adjusted, and adapted manually to ensure code quality and alignment with software engineering best practices.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="sitemap" href="/architecture/overview">
+    Review the high-level architecture
+  </Card>
+  
+  <Card title="Layered Structure" icon="layer-group" href="/architecture/layered-structure">
+    Explore each layer in detail
+  </Card>
+</CardGroup>

@@ -1,80 +1,345 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get up and running with Gestión de Gastos in minutes
 ---
 
-## Get started in three steps
+## Running the Application
 
-Get your documentation site running locally and make your first customization.
+After [installing](/installation) the prerequisites and building the project, you can start the expense tracking application using Maven:
 
-### Step 1: Set up your local environment
+```bash
+mvn exec:java -Dexec.mainClass="com.mibanco.gastos.ui.Consola"
+```
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+You will see the welcome screen:
+
+```
+==================================================
+   BIENVENIDO A LA GESTIÓN DE GASTOS DE MIBANCO
+==================================================
+
+--- MENÚ PRINCIPAL ---
+1. Agregar gasto
+2. Actualizar gasto
+3. Eliminar gasto
+4. Listar todos los gastos
+5. Filtrar gastos por mes
+6. Salir
+Seleccione una opción:
+```
+
+## Your First Expense
+
+Let's walk through adding your first expense to the system.
+
+<Steps>
+  <Step title="Select 'Add Expense' Option">
+    At the main menu, type `1` and press Enter to add a new expense.
+  </Step>
+
+  <Step title="Enter Expense Title">
+    Provide a descriptive title for your expense:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```
+    Título: Almuerzo en restaurante
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    <Note>
+      The title field is **required** and cannot be empty. The system will validate this before saving.
+    </Note>
+  </Step>
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+  <Step title="Enter Optional Reason">
+    Add additional details about the expense (optional):
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```
+    Motivo (Opcional): Reunión de equipo
+    ```
+    
+    You can leave this blank by pressing Enter.
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Enter Date">
+    Provide the expense date in ISO format (YYYY-MM-DD):
+    
+    ```
+    Fecha (Formato AAAA-MM-DD): 2026-03-09
+    ```
+    
+    <Warning>
+      The date must be in **YYYY-MM-DD** format. If you enter an invalid format, the system will prompt you to try again with an example: `2026-03-02`
+    </Warning>
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Enter Amount">
+    Enter the expense amount in Peruvian Soles:
+    
+    ```
+    Monto (S/): 45.50
+    ```
+    
+    The amount will be automatically rounded to 2 decimal places using commercial rounding (HALF_UP).
+  </Step>
 
-### Step 3: Go live
+  <Step title="Confirmation">
+    After entering all data, you'll see:
+    
+    ```
+    Gasto agregado exitosamente
+    ```
+    
+    Your expense has been saved to the `gastos.json` file automatically.
+  </Step>
+</Steps>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## Adding Multiple Expenses
 
-## Next steps
+Let's add a few more expenses to demonstrate the system's capabilities:
 
-Now that you have your docs running, explore these key features:
+<CodeGroup>
 
-<CardGroup cols={2}>
+```text Expense 2: Transportation
+Título: Taxi al trabajo
+Motivo (Opcional): Transporte diario
+Fecha (Formato AAAA-MM-DD): 2026-03-08
+Monto (S/): 12.00
+```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+```text Expense 3: Groceries
+Título: Compras del supermercado
+Motivo (Opcional): Despensa semanal
+Fecha (Formato AAAA-MM-DD): 2026-03-07
+Monto (S/): 150.75
+```
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+```text Expense 4: Utilities
+Título: Pago de luz
+Motivo (Opcional): 
+Fecha (Formato AAAA-MM-DD): 2026-03-01
+Monto (S/): 85.30
+```
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+</CodeGroup>
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+## Viewing Your Expenses
 
-</CardGroup>
+### List All Expenses
+
+From the main menu, select option `4` to list all expenses:
+
+```
+--- LISTA DE GASTOS ---
+[a1b2c3d4] 2026-03-09 | Almuerzo en restaurante | Reunión de equipo | S/ 45.50
+[e5f6g7h8] 2026-03-08 | Taxi al trabajo | Transporte diario | S/ 12.00
+[i9j0k1l2] 2026-03-07 | Compras del supermercado | Despensa semanal | S/ 150.75
+[m3n4o5p6] 2026-03-01 | Pago de luz |  | S/ 85.30
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Expenses are automatically sorted by date in **descending order** (most recent first). Each expense displays an 8-character short ID that you can use for updates and deletions.
 </Note>
+
+### Filter by Month
+
+To view expenses for a specific month, select option `5`:
+
+```
+--- FILTRAR GASTOS POR MES ---
+Ingrese el mes (1-12): 3
+Ingrese el año (ejemplo: 2026): 2026
+```
+
+This will display all expenses from March 2026, sorted chronologically:
+
+```
+[a1b2c3d4] 2026-03-09 | Almuerzo en restaurante | Reunión de equipo | S/ 45.50
+[e5f6g7h8] 2026-03-08 | Taxi al trabajo | Transporte diario | S/ 12.00
+[i9j0k1l2] 2026-03-07 | Compras del supermercado | Despensa semanal | S/ 150.75
+[m3n4o5p6] 2026-03-01 | Pago de luz |  | S/ 85.30
+```
+
+## Updating an Expense
+
+Found a mistake in an expense? You can update it using its 8-character ID.
+
+<Steps>
+  <Step title="Select Update Option">
+    From the main menu, type `2` and press Enter.
+  </Step>
+
+  <Step title="Enter Expense ID">
+    Copy the 8-character ID from your expense list:
+    
+    ```
+    Ingrese el ID (8 caracteres) del gasto (o '0' para cancelar): a1b2c3d4
+    ```
+  </Step>
+
+  <Step title="Enter Updated Information">
+    Provide the new values for all fields:
+    
+    ```
+    Nuevo Título: Almuerzo ejecutivo
+    Nuevo Motivo (Opcional): Reunión con cliente importante
+    Fecha (Formato AAAA-MM-DD): 2026-03-09
+    Monto (S/): 65.00
+    ```
+  </Step>
+
+  <Step title="Confirmation">
+    ```
+    Gasto actualizado exitosamente
+    ```
+  </Step>
+</Steps>
+
+## Deleting an Expense
+
+To remove an expense from the system:
+
+<Steps>
+  <Step title="Select Delete Option">
+    From the main menu, type `3` and press Enter.
+  </Step>
+
+  <Step title="Enter Expense ID">
+    ```
+    Ingrese el ID (8 caracteres) del gasto (o '0' para cancelar): e5f6g7h8
+    ```
+  </Step>
+
+  <Step title="Confirm Deletion">
+    The system requires confirmation before deleting:
+    
+    ```
+    ¿Está seguro que desea eliminar este gasto? (S/N): S
+    ```
+    
+    <Warning>
+      Type `S` to confirm or `N` to cancel. Deletion is permanent and cannot be undone.
+    </Warning>
+  </Step>
+
+  <Step title="Confirmation">
+    ```
+    Gasto eliminado exitosamente
+    ```
+  </Step>
+</Steps>
+
+## Understanding the Data Model
+
+Each expense stored in `gastos.json` follows this structure:
+
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "titulo": "Almuerzo ejecutivo",
+  "motivo": "Reunión con cliente importante",
+  "fecha": "2026-03-09",
+  "monto": 65.00
+}
+```
+
+### Field Validation
+
+The application enforces strict validation rules:
+
+<CardGroup cols={2}>
+  <Card title="Title Validation" icon="check">
+    - Cannot be null or empty
+    - Whitespace-only titles are rejected
+  </Card>
+  
+  <Card title="Date Validation" icon="calendar">
+    - Must be in ISO format (YYYY-MM-DD)
+    - Cannot be null
+    - Parsed using Java's LocalDate
+  </Card>
+  
+  <Card title="Amount Validation" icon="money-bill">
+    - Must be greater than zero
+    - Automatically rounded to 2 decimals
+    - Uses HALF_UP rounding mode
+  </Card>
+  
+  <Card title="ID Handling" icon="hashtag">
+    - Auto-generated UUID
+    - 8-character short IDs for user operations
+    - System prevents duplicate IDs
+  </Card>
+</CardGroup>
+
+## Error Handling Examples
+
+The application provides helpful error messages for common mistakes:
+
+### Invalid Date Format
+
+```
+Fecha (Formato AAAA-MM-DD): 09-03-2026
+Formato de fecha incorrecto, use AAAA-MM-DD (ejemplo: 2026-03-02)
+```
+
+### Invalid Amount
+
+```
+Monto (S/): abc
+Monto inválido. Ingrese un número válido (ejemplo: 120.50)
+```
+
+### Empty Title
+
+```
+Título: 
+Error de validación: El título del gasto no puede estar vacío
+```
+
+### Negative or Zero Amount
+
+```
+Monto (S/): -50
+Error de validación: El monto del gasto debe ser mayor a cero
+```
+
+## Data Persistence
+
+All expenses are automatically saved to `gastos.json` in the project root directory. The file is updated whenever you:
+
+- Add a new expense
+- Update an existing expense
+- Delete an expense
+
+<Note>
+  The JSON file is human-readable and uses Jackson with JSR310 support for proper `LocalDate` serialization. You can back up this file to preserve your expense history.
+</Note>
+
+## Exiting the Application
+
+To close the application, select option `6` from the main menu:
+
+```
+Gracias por usar el sistema de Gestión de Gastos de Mibanco!
+```
+
+## Next Steps
+
+Now that you've learned the basics, explore more advanced features:
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="code" href="/api/gasto-service">
+    Deep dive into the service layer and repository implementation
+  </Card>
+  
+  <Card title="Architecture Guide" icon="diagram-project" href="/architecture/overview">
+    Learn about the layered architecture and design patterns
+  </Card>
+  
+  <Card title="Testing Guide" icon="flask" href="/development/testing">
+    Understand the testing strategy and run unit tests
+  </Card>
+  
+  <Card title="CI/CD Pipeline" icon="gears" href="/development/ci-cd">
+    Learn about automated testing with GitHub Actions
+  </Card>
+</CardGroup>

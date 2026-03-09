@@ -1,0 +1,467 @@
+---
+title: 'Contributing Guide'
+description: 'How to contribute to the Gestión de Gastos Mibanco project'
+---
+
+## Welcome Contributors
+
+Thank you for your interest in contributing to the Gestión de Gastos Mibanco project! This guide will help you set up your development environment and understand the project standards.
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+<CardGroup cols={2}>
+  <Card title="Java Development Kit" icon="java">
+    JDK 17 or higher required
+  </Card>
+  <Card title="Apache Maven" icon="box">
+    Version 3.6+ for dependency management
+  </Card>
+  <Card title="Git" icon="git">
+    For version control
+  </Card>
+  <Card title="Code Editor" icon="code">
+    VS Code, IntelliJ IDEA, or Eclipse recommended
+  </Card>
+</CardGroup>
+
+## Development Environment Setup
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/AngheloMP10/gestion-gastos-mibanco.git
+    cd gestion-gastos-mibanco
+    ```
+  </Step>
+  
+  <Step title="Verify Java version">
+    ```bash
+    java -version
+    # Should show version 17 or higher
+    ```
+  </Step>
+  
+  <Step title="Download dependencies">
+    ```bash
+    mvn clean install
+    ```
+    This downloads all required dependencies and compiles the project.
+  </Step>
+  
+  <Step title="Run tests to verify setup">
+    ```bash
+    mvn test
+    ```
+    All tests should pass with a green build.
+  </Step>
+  
+  <Step title="Run the application">
+    ```bash
+    mvn exec:java -Dexec.mainClass="com.mibanco.gastos.ui.Consola"
+    ```
+  </Step>
+</Steps>
+
+<Note>
+If you encounter any issues during setup, ensure your `JAVA_HOME` environment variable points to JDK 17 or higher.
+</Note>
+
+## Project Structure
+
+Understanding the project architecture will help you contribute effectively:
+
+```
+src/
+├── main/java/com/mibanco/gastos/
+│   ├── model/          # Domain entities (Gasto)
+│   ├── repository/     # Data access layer (GastoRepository, FileGastoRepository)
+│   ├── service/        # Business logic (GastoService)
+│   ├── exception/      # Custom exceptions (GastoException)
+│   └── ui/             # Console interface (Consola)
+└── test/java/com/mibanco/gastos/
+    └── service/        # Unit tests (GastoServiceTest)
+```
+
+### Layer Responsibilities
+
+<Accordion title="Model Layer">
+Contains domain entities with business-specific properties. The `Gasto` class uses `BigDecimal` for financial precision and `LocalDate` for date handling.
+
+**Key file:** `model/Gasto.java`
+</Accordion>
+
+<Accordion title="Repository Layer">
+Handles data persistence. The interface `GastoRepository` defines the contract, while `FileGastoRepository` implements JSON file storage using Jackson.
+
+**Key files:** `repository/GastoRepository.java`, `repository/FileGastoRepository.java`
+</Accordion>
+
+<Accordion title="Service Layer">
+Contains all business logic and validation rules. This layer is the primary focus of unit testing.
+
+**Key file:** `service/GastoService.java`
+</Accordion>
+
+<Accordion title="UI Layer">
+Console-based user interface for interacting with the application.
+
+**Key file:** `ui/Consola.java`
+</Accordion>
+
+## Coding Standards
+
+### Java Conventions
+
+Follow these standards to maintain code consistency:
+
+<CodeGroup>
+```java Class Naming
+// Classes: PascalCase
+public class GastoService { }
+public class FileGastoRepository { }
+
+// Interfaces: PascalCase (no "I" prefix)
+public interface GastoRepository { }
+```
+
+```java Variable Naming
+// Variables and methods: camelCase
+private final GastoRepository repository;
+public void agregarGasto(String titulo, ...) { }
+
+// Constants: UPPER_SNAKE_CASE
+private static final int MIN_ID_LENGTH = 8;
+```
+
+```java Comments
+// Use Spanish for domain-specific comments
+// Inyección de dependencias por constructor para el testeo
+public GastoService(GastoRepository repository) {
+    this.repository = repository;
+}
+```
+</CodeGroup>
+
+### Financial Precision Rules
+
+Always use `BigDecimal` for monetary amounts, never `double` or `float`:
+
+```java
+// ✓ Correct
+BigDecimal monto = new BigDecimal("1500.50");
+
+// ✗ Wrong - loses precision
+double monto = 1500.50;
+
+// ✓ Always round to 2 decimal places
+public void setMonto(BigDecimal monto) {
+    if (monto != null) {
+        this.monto = monto.setScale(2, RoundingMode.HALF_UP);
+    }
+}
+```
+
+<Warning>
+Using floating-point types for money can lead to precision errors. This project strictly enforces `BigDecimal` usage for all financial calculations.
+</Warning>
+
+### Dependency Injection
+
+Always use constructor injection to enable testability:
+
+```java
+public class GastoService {
+    private final GastoRepository repository;
+
+    // Inyección de dependencias por constructor para el testeo
+    public GastoService(GastoRepository repository) {
+        this.repository = repository;
+    }
+}
+```
+
+This pattern allows tests to inject fake repositories without file system dependencies.
+
+## Testing Requirements
+
+All code contributions must include appropriate tests:
+
+### Test Structure
+
+```java
+@Test
+void descriptiveTestNameInSpanish() {
+    // Arrange - Set up test data
+    String titulo = "Matrícula universitaria";
+    BigDecimal monto = new BigDecimal("1500.50");
+    
+    // Act - Execute the method being tested
+    gastoService.agregarGasto(titulo, "motivo", LocalDate.now(), monto);
+    
+    // Assert - Verify expected behavior
+    assertEquals(1, falsoRepository.gastos.size());
+}
+```
+
+### Testing Guidelines
+
+<Steps>
+  <Step title="Use @BeforeEach for setup">
+    Reset state before each test to ensure isolation:
+    ```java
+    @BeforeEach
+    void setUp() {
+        falsoRepository = new FalsoGastoRepository();
+        gastoService = new GastoService(falsoRepository);
+    }
+    ```
+  </Step>
+  
+  <Step title="Test business rules">
+    Focus on validation logic and exception handling:
+    ```java
+    @Test
+    void noDebePermitirMontoNegativoOIgualAZero() {
+        assertThrows(GastoException.class, () -> {
+            gastoService.agregarGasto("Titulo", "Motivo", 
+                LocalDate.now(), new BigDecimal("-100"));
+        });
+    }
+    ```
+  </Step>
+  
+  <Step title="Run tests before committing">
+    ```bash
+    mvn test
+    ```
+    All tests must pass before submitting changes.
+  </Step>
+</Steps>
+
+## Making Changes
+
+### Workflow
+
+<Steps>
+  <Step title="Create a feature branch">
+    ```bash
+    git checkout -b feature/your-feature-name
+    ```
+    Use descriptive branch names like `feature/add-category-filter` or `fix/decimal-rounding`.
+  </Step>
+  
+  <Step title="Make your changes">
+    - Follow the coding standards
+    - Write clean, readable code
+    - Add comments for complex logic
+  </Step>
+  
+  <Step title="Write or update tests">
+    ```bash
+    # Run tests frequently during development
+    mvn test
+    ```
+  </Step>
+  
+  <Step title="Commit your changes">
+    ```bash
+    git add .
+    git commit -m "feat: add category filtering to expenses"
+    ```
+    Use conventional commit messages (see below).
+  </Step>
+  
+  <Step title="Push and create a pull request">
+    ```bash
+    git push origin feature/your-feature-name
+    ```
+    Then create a PR on GitHub with a clear description.
+  </Step>
+</Steps>
+
+### Commit Message Format
+
+Use conventional commits for clear history:
+
+```bash
+# Feature additions
+git commit -m "feat: add expense category field"
+
+# Bug fixes
+git commit -m "fix: correct decimal rounding in monto calculation"
+
+# Refactoring
+git commit -m "refactor: extract validation logic to separate method"
+
+# Tests
+git commit -m "test: add tests for filtrarGastosPorMes edge cases"
+
+# Documentation
+git commit -m "docs: update README with installation instructions"
+```
+
+## Pull Request Guidelines
+
+When creating a pull request:
+
+<Steps>
+  <Step title="Write a clear description">
+    Explain what changes you made and why:
+    ```markdown
+    ## Summary
+    Adds category filtering functionality to expenses.
+    
+    ## Changes
+    - Added `categoria` field to `Gasto` model
+    - Updated `GastoService` with `filtrarPorCategoria` method
+    - Added comprehensive tests for category filtering
+    
+    ## Testing
+    All tests pass. Added 3 new test cases.
+    ```
+  </Step>
+  
+  <Step title="Ensure CI passes">
+    The GitHub Actions workflow must complete successfully before merge.
+  </Step>
+  
+  <Step title="Request review">
+    Wait for maintainer feedback and address any comments.
+  </Step>
+</Steps>
+
+## Code Review Process
+
+When your PR is reviewed, expect feedback on:
+
+- **Code quality**: Adherence to coding standards
+- **Test coverage**: Adequate tests for new functionality
+- **Business logic**: Correct validation and error handling
+- **Performance**: Efficient use of streams and collections
+- **Documentation**: Clear comments and updated docs
+
+## Dependencies and Libraries
+
+### Adding New Dependencies
+
+If you need to add a new dependency:
+
+1. **Justify the need** - Explain why it's necessary
+2. **Check license compatibility** - Ensure it's permissive (Apache, MIT, etc.)
+3. **Add to pom.xml** with version:
+
+```xml
+<dependency>
+    <groupId>group.id</groupId>
+    <artifactId>artifact-name</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### Current Dependencies
+
+<AccordionGroup>
+  <Accordion title="jackson-databind (2.15.2)">
+    JSON serialization/deserialization for data persistence to `gastos.json`
+  </Accordion>
+  
+  <Accordion title="jackson-datatype-jsr310 (2.15.2)">
+    Support for Java 8+ date/time types like `LocalDate` in JSON
+  </Accordion>
+  
+  <Accordion title="junit-jupiter-api (5.10.0)">
+    JUnit 5 API for writing tests
+  </Accordion>
+  
+  <Accordion title="junit-jupiter-engine (5.10.0)">
+    JUnit 5 test execution engine
+  </Accordion>
+</AccordionGroup>
+
+## IDE Setup
+
+### IntelliJ IDEA
+
+<Steps>
+  <Step title="Open project">
+    File → Open → Select project directory
+  </Step>
+  
+  <Step title="Configure JDK">
+    File → Project Structure → Project SDK → Select JDK 17
+  </Step>
+  
+  <Step title="Import Maven project">
+    IntelliJ auto-detects `pom.xml` and downloads dependencies
+  </Step>
+  
+  <Step title="Run tests">
+    Right-click `src/test/java` → Run 'All Tests'
+  </Step>
+</Steps>
+
+### Visual Studio Code
+
+<Steps>
+  <Step title="Install extensions">
+    - Extension Pack for Java
+    - Maven for Java
+  </Step>
+  
+  <Step title="Open project folder">
+    File → Open Folder → Select project directory
+  </Step>
+  
+  <Step title="Configure Java">
+    Ensure `java.configuration.runtimes` points to JDK 17 in settings.json
+  </Step>
+  
+  <Step title="Run tests">
+    Use Testing sidebar or run `mvn test` in terminal
+  </Step>
+</Steps>
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Issues" icon="circle-exclamation">
+    Report bugs or request features via GitHub Issues
+  </Card>
+  <Card title="Discussions" icon="comments">
+    Ask questions in GitHub Discussions
+  </Card>
+  <Card title="Documentation" icon="book">
+    Check this documentation site for guidance
+  </Card>
+  <Card title="Code Examples" icon="code">
+    Review existing tests for implementation patterns
+  </Card>
+</CardGroup>
+
+## AI-Assisted Development
+
+This project was developed with assistance from **GitHub Copilot**. When using AI tools:
+
+<Note>
+AI suggestions are helpful for boilerplate code and validation, but always review and understand the code before committing. Maintain manual control over technical decisions.
+</Note>
+
+### Recommended AI Usage
+
+- Validating configuration files (pom.xml, workflows)
+- Generating boilerplate test structures
+- Refactoring suggestions
+- Documentation improvements
+
+### Important Reminders
+
+- Always review AI-generated code
+- Ensure it follows project standards
+- Test thoroughly before committing
+- Document why specific approaches were chosen
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the same license as the project.

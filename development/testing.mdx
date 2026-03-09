@@ -1,0 +1,263 @@
+---
+title: 'Testing'
+description: 'Testing strategy and best practices for the expense management system'
+---
+
+## Overview
+
+The project uses **JUnit 5** for unit testing with a focus on testing business logic in isolation from external dependencies. Tests employ the **Fake Object pattern** to create fast, deterministic tests without file system dependencies.
+
+## Testing Stack
+
+<CardGroup cols={2}>
+  <Card title="JUnit 5" icon="flask">
+    Modern testing framework with annotations and assertions
+  </Card>
+  <Card title="Maven Surefire" icon="gear">
+    Test execution and reporting plugin
+  </Card>
+</CardGroup>
+
+### Dependencies
+
+The testing dependencies are configured in `pom.xml`:
+
+```xml
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter-api</artifactId>
+    <version>5.10.0</version>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter-engine</artifactId>
+    <version>5.10.0</version>
+    <scope>test</scope>
+</dependency>
+```
+
+## Test Structure
+
+### The Arrange-Act-Assert Pattern
+
+All tests follow the **AAA pattern** for clarity and consistency:
+
+```java
+@Test
+void debeCrearGastoUniversitarioValido() {
+    // Arrange
+    String titulo = "Matrícula universitaria";
+    String motivo = "Pago ciclo 2026-I";
+    LocalDate fecha = LocalDate.now();
+    BigDecimal monto = new BigDecimal("1500.50");
+
+    // Act
+    gastoService.agregarGasto(titulo, motivo, fecha, monto);
+
+    // Assert
+    assertEquals(1, falsoRepository.gastos.size(), "Debe haber 1 gasto exacto en el repositorio");
+    Gasto guardado = falsoRepository.gastos.get(0);
+    assertEquals(titulo, guardado.getTitulo());
+    assertEquals(new BigDecimal("1500.50"), guardado.getMonto());
+}
+```
+
+### Test Setup with @BeforeEach
+
+The `@BeforeEach` annotation ensures test isolation by creating fresh instances before each test:
+
+```java
+private GastoService gastoService;
+private FalsoGastoRepository falsoRepository;
+
+// @BeforeEach se ejecuta antes de cada test para que no interfieran entre si
+@BeforeEach
+void setUp() {
+    falsoRepository = new FalsoGastoRepository();
+    gastoService = new GastoService(falsoRepository);
+}
+```
+
+<Note>
+This setup method runs before every test, ensuring no test pollution and complete isolation between test cases.
+</Note>
+
+## Fake Object Pattern
+
+### Why Fake Repository?
+
+The project uses a **Fake Repository** implementation instead of mocking frameworks or real file I/O to:
+
+- Eliminate file system dependencies
+- Make tests fast and deterministic
+- Simplify debugging with real object behavior
+- Avoid external library dependencies for mocking
+
+### Implementation
+
+The fake repository is implemented as a static inner class within the test file:
+
+```java
+private static class FalsoGastoRepository implements GastoRepository {
+    final List<Gasto> gastos = new ArrayList<>();
+
+    @Override
+    public List<Gasto> findAll() {
+        return new ArrayList<>(gastos);
+    }
+
+    @Override
+    public Optional<Gasto> findById(UUID id) {
+        return gastos.stream().filter(g -> g.getId().equals(id)).findFirst();
+    }
+
+    @Override
+    public void save(Gasto gasto) {
+        gastos.add(gasto);
+    }
+
+    @Override
+    public void update(Gasto gasto) {
+        deleteById(gasto.getId());
+        save(gasto);
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        gastos.removeIf(g -> g.getId().equals(id));
+    }
+}
+```
+
+<Accordion title="Why use a fake instead of a mock?">
+Fakes provide real implementation behavior which makes tests more readable and closer to production code execution. They don't require learning a mocking framework and make it easier to verify complex interactions. Since the repository logic is simple, a fake is more appropriate than a full mock.
+</Accordion>
+
+## Testing Business Rules
+
+### Validation Tests
+
+Test exception handling for business rule violations:
+
+```java
+@Test
+void noDebePermitirMontoNegativoOIgualAZero() {
+    // Arrange
+    String titulo = "Curso de programación";
+    LocalDate fecha = LocalDate.now();
+    BigDecimal montoNegativo = new BigDecimal("-100.00");
+    BigDecimal montoCero = BigDecimal.ZERO;
+
+    // Act y Assert para negativo
+    GastoException exceptionNegativo = assertThrows(GastoException.class, () -> {
+        gastoService.agregarGasto(titulo, "Pago de curso", fecha, montoNegativo);
+    });
+    assertTrue(exceptionNegativo.getMessage().contains("mayor a cero"));
+
+    // Act y Assert para cero
+    assertThrows(GastoException.class, () -> {
+        gastoService.agregarGasto(titulo, "Pago de curso", fecha, montoCero);
+    });
+
+    assertTrue(falsoRepository.gastos.isEmpty());
+}
+```
+
+### Filtering and Data Integrity
+
+Test complex business logic like date filtering:
+
+```java
+@Test
+void debeFiltrarGastosPorMesYAnioCorrectamente() {
+    // Arrange, 3 gastos
+    gastoService.agregarGasto("Gasto Marzo 1", "", LocalDate.of(2026, 3, 10), new BigDecimal("100"));
+    gastoService.agregarGasto("Gasto Marzo 2", "", LocalDate.of(2026, 3, 15), new BigDecimal("200"));
+    gastoService.agregarGasto("Gasto Enero", "", LocalDate.of(2026, 1, 5), new BigDecimal("50"));
+
+    // Act
+    List<Gasto> resultadoMarzo = gastoService.filtrarGastosPorMes(3, 2026);
+    List<Gasto> resultadoEnero = gastoService.filtrarGastosPorMes(1, 2026);
+
+    // Assert
+    assertEquals(2, resultadoMarzo.size(), "Debe haber 2 gastos en Marzo");
+    assertEquals(1, resultadoEnero.size(), "Debe haber 1 gasto en Enero");
+}
+```
+
+## Running Tests
+
+<Steps>
+  <Step title="Run all tests">
+    Execute the complete test suite using Maven:
+    ```bash
+    mvn test
+    ```
+  </Step>
+  
+  <Step title="Run specific test class">
+    Target a specific test class:
+    ```bash
+    mvn test -Dtest=GastoServiceTest
+    ```
+  </Step>
+  
+  <Step title="Run with coverage">
+    Include compilation and packaging to verify everything builds:
+    ```bash
+    mvn clean package
+    ```
+  </Step>
+</Steps>
+
+## Test Coverage
+
+The current test suite covers:
+
+- **Business logic validation**: Amount validation, title requirements, date constraints
+- **CRUD operations**: Create, read, update, and delete expenses
+- **Filtering logic**: Month and year-based filtering with proper sorting
+- **ID resolution**: Short UUID matching and collision detection
+- **Exception handling**: All custom `GastoException` scenarios
+
+<Note>
+Tests focus on the service layer where business logic resides. The repository layer is tested indirectly through service tests using the fake repository pattern.
+</Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Test Isolation" icon="flask-vial">
+    Use `@BeforeEach` to ensure each test starts with a clean state
+  </Card>
+  <Card title="Descriptive Names" icon="signature">
+    Test method names describe what they verify in Spanish (domain language)
+  </Card>
+  <Card title="AAA Pattern" icon="list-ol">
+    Always structure tests with Arrange, Act, Assert sections
+  </Card>
+  <Card title="Fast Execution" icon="bolt">
+    Use fake objects instead of real I/O for speed and reliability
+  </Card>
+</CardGroup>
+
+## Common Assertions
+
+```java
+// Equality assertions
+assertEquals(expected, actual, "Optional failure message");
+
+// Boolean assertions
+assertTrue(condition, "Optional message");
+assertFalse(condition, "Optional message");
+
+// Exception assertions
+assertThrows(GastoException.class, () -> {
+    // Code that should throw
+});
+
+// Collection assertions
+assertTrue(collection.isEmpty());
+assertEquals(expectedSize, collection.size());
+```

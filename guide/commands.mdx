@@ -1,0 +1,530 @@
+---
+title: Menu Commands Reference
+description: Complete guide to all menu options and their validation rules
+---
+
+## Command Overview
+
+The Gestión de Gastos application provides six main commands accessible through the menu system. Each command has specific validation rules and input requirements.
+
+## 1. Agregar Gasto (Add Expense)
+
+Add a new expense to the system with automatic UUID generation.
+
+### Usage Flow
+
+<Steps>
+  <Step title="Select Option 1">
+    ```
+    Seleccione una opción: 1
+    
+    --- AGREGAR NUEVO GASTO ---
+    ```
+  </Step>
+
+  <Step title="Enter Title">
+    ```
+    Título: Matrícula universitaria
+    ```
+    <Note>Title is required and cannot be empty.</Note>
+  </Step>
+
+  <Step title="Enter Reason (Optional)">
+    ```
+    Motivo (Opcional): Pago ciclo 2026-I
+    ```
+    This field is optional - press Enter to leave it empty.
+  </Step>
+
+  <Step title="Enter Date">
+    ```
+    Fecha (Formato AAAA-MM-DD): 2026-03-03
+    ```
+  </Step>
+
+  <Step title="Enter Amount">
+    ```
+    Monto (S/): 1500.50
+    ```
+  </Step>
+
+  <Step title="Confirmation">
+    ```
+    Gasto agregado exitosamente
+    ```
+  </Step>
+</Steps>
+
+### Implementation Details
+
+```java
+// From Consola.java:66-79
+private static void agregarGasto() {
+    System.out.println("\n--- AGREGAR NUEVO GASTO ---");
+    System.out.print("Título: ");
+    String titulo = scanner.nextLine();
+
+    System.out.print("Motivo (Opcional): ");
+    String motivo = scanner.nextLine();
+
+    LocalDate fecha = leerFecha();
+    BigDecimal monto = leerMonto();
+
+    servicio.agregarGasto(titulo, motivo, fecha, monto);
+    System.out.println("Gasto agregado exitosamente");
+}
+```
+
+### Validation Rules
+
+The system validates the following business rules:
+
+```java
+// From GastoService.java:73-83
+private void validarDatosGasto(String titulo, LocalDate fecha, BigDecimal monto) {
+    if (titulo == null || titulo.trim().isEmpty()) {
+        throw new GastoException("El título del gasto no puede estar vacío");
+    }
+    if (fecha == null) {
+        throw new GastoException("La fecha del gasto es obligatoria");
+    }
+    if (monto == null || monto.compareTo(BigDecimal.ZERO) <= 0) {
+        throw new GastoException("El monto del gasto debe ser mayor a cero");
+    }
+}
+```
+
+<Warning>
+**Validation Errors:**
+- Title cannot be empty or contain only whitespace
+- Date is required and must be in `YYYY-MM-DD` format
+- Amount must be greater than zero
+</Warning>
+
+### Amount Rounding
+
+All amounts are automatically rounded to 2 decimal places using commercial rounding:
+
+```java
+// From Gasto.java:68-72
+public void setMonto(BigDecimal monto) {
+    if (monto != null) {
+        this.monto = monto.setScale(2, RoundingMode.HALF_UP);
+    }
+}
+```
+
+## 2. Actualizar Gasto (Update Expense)
+
+Modify an existing expense by providing its ID and new values.
+
+### Usage Flow
+
+<Steps>
+  <Step title="Select Option 2">
+    ```
+    Seleccione una opción: 2
+    
+    --- ACTUALIZAR GASTO ---
+    ```
+  </Step>
+
+  <Step title="Enter Expense ID">
+    ```
+    Ingrese el ID (8 caracteres) del gasto (o '0' para cancelar): 8762c7b5
+    ```
+    <Note>Enter at least the first 8 characters of the UUID. Type `0` to cancel.</Note>
+  </Step>
+
+  <Step title="Enter New Values">
+    ```
+    Nuevo Título: Matrícula universitaria 2026-I
+    Nuevo Motivo (Opcional): Pago completo ciclo académico
+    Fecha (Formato AAAA-MM-DD): 2026-03-03
+    Monto (S/): 1600.00
+    ```
+  </Step>
+
+  <Step title="Confirmation">
+    ```
+    Gasto actualizado exitosamente
+    ```
+  </Step>
+</Steps>
+
+### Implementation Details
+
+```java
+// From Consola.java:81-102
+private static void actualizarGasto() {
+    System.out.println("\n--- ACTUALIZAR GASTO ---");
+    System.out.print("Ingrese el ID (8 caracteres) del gasto (o '0' para cancelar): ");
+    String idCorto = scanner.nextLine().trim();
+
+    if (idCorto.equals("0")) {
+        System.out.println("Operación cancelada por el usuario");
+        return;
+    }
+
+    System.out.print("Nuevo Título: ");
+    String titulo = scanner.nextLine();
+
+    System.out.print("Nuevo Motivo (Opcional): ");
+    String motivo = scanner.nextLine();
+
+    LocalDate fecha = leerFecha();
+    BigDecimal monto = leerMonto();
+
+    servicio.actualizarGasto(idCorto, titulo, motivo, fecha, monto);
+    System.out.println("Gasto actualizado exitosamente");
+}
+```
+
+### ID Matching Logic
+
+```java
+// From GastoService.java:86-104
+private UUID obtenerUUIDPorIdCorto(String idCorto) {
+    if (idCorto == null || idCorto.length() < 8) {
+        throw new GastoException("Debe ingresar al menos los primeros 8 caracteres del ID");
+    }
+
+    List<UUID> coincidencias = repository.findAll().stream()
+            .map(Gasto::getId)
+            .filter(id -> id.toString().startsWith(idCorto))
+            .toList();
+
+    if (coincidencias.isEmpty()) {
+        throw new GastoException("No se encontró ningún gasto que coincida con el ID proporcionado");
+    }
+    if (coincidencias.size() > 1) {
+        throw new GastoException("El ID ingresado coincide con múltiples gastos. Ingrese más caracteres");
+    }
+
+    return coincidencias.get(0);
+}
+```
+
+<Warning>
+**Common Errors:**
+- `Debe ingresar al menos los primeros 8 caracteres del ID` - ID too short
+- `No se encontró ningún gasto que coincida con el ID proporcionado` - ID not found
+- `El ID ingresado coincide con múltiples gastos` - Ambiguous ID, need more characters
+</Warning>
+
+## 3. Eliminar Gasto (Delete Expense)
+
+Remove an expense from the system with confirmation prompt.
+
+### Usage Flow
+
+<Steps>
+  <Step title="Select Option 3">
+    ```
+    Seleccione una opción: 3
+    
+    --- ELIMINAR GASTO ---
+    ```
+  </Step>
+
+  <Step title="Enter Expense ID">
+    ```
+    Ingrese el ID (8 caracteres) del gasto (o '0' para cancelar): 8762c7b5
+    ```
+  </Step>
+
+  <Step title="Confirm Deletion">
+    ```
+    ¿Está seguro que desea eliminar este gasto? (S/N): S
+    ```
+    <Warning>This action cannot be undone. Type `S` to confirm or anything else to cancel.</Warning>
+  </Step>
+
+  <Step title="Confirmation">
+    ```
+    Gasto eliminado exitosamente
+    ```
+  </Step>
+</Steps>
+
+### Implementation Details
+
+```java
+// From Consola.java:104-124
+private static void eliminarGasto() {
+    System.out.println("\n--- ELIMINAR GASTO ---");
+    System.out.print("Ingrese el ID (8 caracteres) del gasto (o '0' para cancelar): ");
+    String idCorto = scanner.nextLine().trim();
+
+    if (idCorto.equals("0")) {
+        System.out.println("Operación cancelada por el usuario");
+        return;
+    }
+
+    System.out.print("¿Está seguro que desea eliminar este gasto? (S/N): ");
+    String confirmacion = scanner.nextLine().trim().toUpperCase();
+
+    if (!confirmacion.equals("S")) {
+        System.out.println("Eliminación cancelada");
+        return;
+    }
+
+    servicio.eliminarGasto(idCorto);
+    System.out.println("Gasto eliminado exitosamente");
+}
+```
+
+### Safety Features
+
+<Accordion title="Two-Step Cancellation">
+  You can cancel the deletion in two ways:
+  1. Enter `0` when prompted for the ID
+  2. Enter anything other than `S` when asked for confirmation
+</Accordion>
+
+<Accordion title="Validation Before Deletion">
+  ```java
+  // From GastoService.java:45-53
+  public void eliminarGasto(String idCorto) {
+      UUID idReal = obtenerUUIDPorIdCorto(idCorto);
+
+      repository.findById(idReal)
+              .orElseThrow(() -> new GastoException(
+                      "No se puede eliminar porque no se encontró un gasto con el ID: " + idReal));
+
+      repository.deleteById(idReal);
+  }
+  ```
+  The system verifies the expense exists before attempting deletion.
+</Accordion>
+
+## 4. Listar Todos los Gastos (List All Expenses)
+
+Display all expenses in the system, sorted by date (newest first).
+
+### Usage
+
+```
+Seleccione una opción: 4
+
+--- LISTA DE GASTOS ---
+[8762c7b5] 2026-03-03 | Matrícula universitaria | Pago ciclo 2026-I | S/ 1500.50
+[797deabe] 2026-03-01 | Pago de internet | Servicio mensual marzo | S/ 50.00
+[9b71444e] 2026-02-28 | Compra supermercado | Alimentos última semana de Febrero | S/ 245.30
+[e103a305] 2026-02-05 | Compra de libros | Material de estudio | S/ 80.50
+[bd14b0f3] 2026-01-02 | Transporte mensual | Recarga tarjeta transporte | S/ 95.20
+```
+
+### Implementation Details
+
+```java
+// From Consola.java:126-135
+private static void listarGastos() {
+    System.out.println("\n--- LISTA DE GASTOS ---");
+    List<Gasto> gastos = servicio.listarGastos();
+
+    if (gastos.isEmpty()) {
+        System.out.println("No hay gastos registrados");
+    } else {
+        gastos.forEach(System.out::println);
+    }
+}
+```
+
+### Sorting Logic
+
+```java
+// From GastoService.java:55-59
+public List<Gasto> listarGastos() {
+    return repository.findAll().stream()
+            .sorted(Comparator.comparing(Gasto::getFecha).reversed())
+            .toList();
+}
+```
+
+<Note>
+Expenses are automatically sorted by date in descending order (newest first).
+</Note>
+
+### Display Format
+
+Each expense is displayed using this format:
+
+```java
+// From Gasto.java:75-82
+@Override
+public String toString() {
+    return String.format("[%s] %s | %s | %s | S/ %s",
+            id.toString().substring(0, 8),
+            fecha,
+            titulo,
+            motivo,
+            monto);
+}
+```
+
+Format breakdown: `[ID] DATE | TITLE | REASON | S/ AMOUNT`
+
+## 5. Filtrar Gastos por Mes (Filter by Month)
+
+Display expenses for a specific month and year.
+
+### Usage Flow
+
+<Steps>
+  <Step title="Select Option 5">
+    ```
+    Seleccione una opción: 5
+    
+    --- FILTRAR GASTOS POR MES ---
+    ```
+  </Step>
+
+  <Step title="Enter Month">
+    ```
+    Ingrese el mes (1-12): 3
+    ```
+  </Step>
+
+  <Step title="Enter Year">
+    ```
+    Ingrese el año (ejemplo: 2026): 2026
+    ```
+  </Step>
+
+  <Step title="View Results">
+    ```
+    [8762c7b5] 2026-03-03 | Matrícula universitaria | Pago ciclo 2026-I | S/ 1500.50
+    [797deabe] 2026-03-01 | Pago de internet | Servicio mensual marzo | S/ 50.00
+    ```
+  </Step>
+</Steps>
+
+### Implementation Details
+
+```java
+// From Consola.java:137-156
+private static void filtrarGastos() {
+    System.out.println("\n--- FILTRAR GASTOS POR MES ---");
+    try {
+        System.out.print("Ingrese el mes (1-12): ");
+        int mes = Integer.parseInt(scanner.nextLine());
+
+        System.out.print("Ingrese el año (ejemplo: 2026): ");
+        int anio = Integer.parseInt(scanner.nextLine());
+
+        List<Gasto> filtrados = servicio.filtrarGastosPorMes(mes, anio);
+
+        if (filtrados.isEmpty()) {
+            System.out.println("No se encontraron gastos en esa fecha");
+        } else {
+            filtrados.forEach(System.out::println);
+        }
+    } catch (NumberFormatException e) {
+        System.out.println("Error. Ingrese valores numéricos para el mes y el año");
+    }
+}
+```
+
+### Filter Logic
+
+```java
+// From GastoService.java:61-70
+public List<Gasto> filtrarGastosPorMes(int mes, int anio) {
+    if (mes < 1 || mes > 12) {
+        throw new GastoException("El mes debe estar entre 1 y 12");
+    }
+
+    return repository.findAll().stream()
+            .filter(gasto -> gasto.getFecha().getMonthValue() == mes && gasto.getFecha().getYear() == anio)
+            .sorted(Comparator.comparing(Gasto::getFecha).reversed())
+            .toList();
+}
+```
+
+<Warning>
+**Validation:**
+- Month must be between 1 and 12
+- Both month and year must be valid integers
+- Results are sorted by date (newest first)
+</Warning>
+
+## 6. Salir (Exit)
+
+Exit the application safely.
+
+### Usage
+
+```
+Seleccione una opción: 6
+Gracias por usar el sistema de Gestión de Gastos de Mibanco!
+```
+
+### Implementation
+
+```java
+// From Consola.java:38-41
+case 6 -> {
+    salir = true;
+    System.out.println("Gracias por usar el sistema de Gestión de Gastos de Mibanco!");
+}
+```
+
+<Note>
+All data is automatically persisted to `gastos.json` after each operation, so no manual save is needed before exiting.
+</Note>
+
+## Input Validation Helpers
+
+The application includes helper methods to ensure valid data entry:
+
+### Date Validation
+
+```java
+// From Consola.java:159-168
+private static LocalDate leerFecha() {
+    while (true) {
+        System.out.print("Fecha (Formato AAAA-MM-DD): ");
+        try {
+            return LocalDate.parse(scanner.nextLine());
+        } catch (DateTimeParseException e) {
+            System.out.println("Formato de fecha incorrecto, use AAAA-MM-DD (ejemplo: 2026-03-02)");
+        }
+    }
+}
+```
+
+<Note>
+The date input loops until a valid format is provided. Use format: `YYYY-MM-DD`
+</Note>
+
+### Amount Validation
+
+```java
+// From Consola.java:170-179
+private static BigDecimal leerMonto() {
+    while (true) {
+        System.out.print("Monto (S/): ");
+        try {
+            return new BigDecimal(scanner.nextLine());
+        } catch (NumberFormatException e) {
+            System.out.println("Monto inválido. Ingrese un número válido (ejemplo: 120.50)");
+        }
+    }
+}
+```
+
+<Note>
+The amount input loops until a valid decimal number is provided. Use a period (.) for decimal separation.
+</Note>
+
+## Quick Reference Table
+
+| Command | Menu Option | Required Fields | Optional Fields | Validation |
+|---------|-------------|-----------------|-----------------|------------|
+| Add Expense | 1 | Title, Date, Amount | Reason | Title not empty, Amount > 0 |
+| Update Expense | 2 | ID, Title, Date, Amount | Reason | ID exists, Title not empty, Amount > 0 |
+| Delete Expense | 3 | ID, Confirmation | - | ID exists |
+| List Expenses | 4 | - | - | None |
+| Filter by Month | 5 | Month (1-12), Year | - | Month range valid |
+| Exit | 6 | - | - | None |

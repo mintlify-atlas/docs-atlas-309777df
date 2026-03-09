@@ -1,0 +1,532 @@
+---
+title: "GastoRepository"
+description: "Complete API reference for the GastoRepository interface and FileGastoRepository implementation"
+---
+
+## Overview
+
+The repository layer provides data persistence abstraction for the expense management system. It follows the Repository pattern with an interface defining the contract and a file-based implementation.
+
+## GastoRepository Interface
+
+**Package:** `com.mibanco.gastos.repository`
+
+**Location:** `src/main/java/com/mibanco/gastos/repository/GastoRepository.java`
+
+The `GastoRepository` interface defines the contract for expense data access operations. It provides standard CRUD (Create, Read, Update, Delete) operations.
+
+### Methods
+
+#### findAll()
+
+```java
+List<Gasto> findAll()
+```
+
+Retrieves all expenses from the data store.
+
+<ResponseField name="return" type="List<Gasto>">
+  List containing all stored expenses. Returns empty list if no expenses exist.
+</ResponseField>
+
+**Contract:**
+- Must never return null
+- Returns empty list when no data exists
+- No guaranteed ordering
+
+#### findById()
+
+```java
+Optional<Gasto> findById(UUID id)
+```
+
+Finds a specific expense by its unique identifier.
+
+<ParamField path="id" type="UUID" required>
+  The unique identifier of the expense to find
+</ParamField>
+
+<ResponseField name="return" type="Optional<Gasto>">
+  Optional containing the expense if found, or empty Optional if not found
+</ResponseField>
+
+**Contract:**
+- Returns `Optional.empty()` if no expense with the given ID exists
+- Returns `Optional.of(gasto)` if expense is found
+- Never returns null
+
+#### save()
+
+```java
+void save(Gasto gasto)
+```
+
+Persists a new expense to the data store.
+
+<ParamField path="gasto" type="Gasto" required>
+  The expense object to save
+</ParamField>
+
+**Contract:**
+- Adds the expense to the data store
+- Does not check for duplicate IDs
+- Changes must be persisted immediately
+
+#### update()
+
+```java
+void update(Gasto gasto)
+```
+
+Updates an existing expense in the data store.
+
+<ParamField path="gasto" type="Gasto" required>
+  The expense object with updated values (must have existing ID)
+</ParamField>
+
+**Contract:**
+- Locates expense by its ID field
+- Replaces all fields with new values
+- If expense ID not found, behavior is implementation-specific
+
+#### deleteById()
+
+```java
+void deleteById(UUID id)
+```
+
+Removes an expense from the data store.
+
+<ParamField path="id" type="UUID" required>
+  The unique identifier of the expense to delete
+</ParamField>
+
+**Contract:**
+- Removes the expense with the specified ID
+- If ID doesn't exist, operation should complete without error
+- Changes must be persisted immediately
+
+---
+
+## FileGastoRepository Implementation
+
+**Package:** `com.mibanco.gastos.repository`
+
+**Location:** `src/main/java/com/mibanco/gastos/repository/FileGastoRepository.java`
+
+The `FileGastoRepository` is a file-based implementation that stores expenses in a JSON file using Jackson for serialization.
+
+### Configuration
+
+<ParamField path="RUTA_ARCHIVO" type="String" default="gastos.json">
+  Path to the JSON file used for storage. File is created in the application's working directory.
+</ParamField>
+
+### Constructor
+
+```java
+public FileGastoRepository()
+```
+
+Creates a new file-based repository with Jackson ObjectMapper configured for Java 8 time types.
+
+**Configuration:**
+- Registers `JavaTimeModule` for `LocalDate` serialization/deserialization
+- Uses default Jackson configuration otherwise
+
+**Usage:**
+
+```java
+GastoRepository repository = new FileGastoRepository();
+```
+
+### Public Methods
+
+#### findAll()
+
+```java
+@Override
+public List<Gasto> findAll()
+```
+
+Reads all expenses from the JSON file.
+
+<ResponseField name="return" type="List<Gasto>">
+  List of all expenses stored in gastos.json. Returns empty list if file doesn't exist or is empty.
+</ResponseField>
+
+**Throws:**
+- `GastoException` - If JSON file is corrupted or cannot be read
+
+**Behavior:**
+- If file doesn't exist: returns empty `ArrayList`
+- If file exists but is empty (0 bytes): returns empty `ArrayList`
+- Otherwise: deserializes JSON array to `List<Gasto>`
+
+**Implementation:**
+
+```java
+@Override
+public List<Gasto> findAll() {
+    return loadFromFile();
+}
+```
+
+#### findById()
+
+```java
+@Override
+public Optional<Gasto> findById(UUID id)
+```
+
+Finds an expense by UUID using stream filtering.
+
+<ParamField path="id" type="UUID" required>
+  The ID to search for
+</ParamField>
+
+<ResponseField name="return" type="Optional<Gasto>">
+  Optional containing the matching expense, or empty if not found
+</ResponseField>
+
+**Performance:**
+- O(n) time complexity - reads entire file and filters in memory
+- Suitable for small to medium datasets
+
+**Implementation:**
+
+```java
+@Override
+public Optional<Gasto> findById(UUID id) {
+    return findAll().stream()
+            .filter(gasto -> gasto.getId().equals(id))
+            .findFirst();
+}
+```
+
+#### save()
+
+```java
+@Override
+public void save(Gasto gasto)
+```
+
+Appends a new expense to the JSON file.
+
+<ParamField path="gasto" type="Gasto" required>
+  The expense to save
+</ParamField>
+
+**Throws:**
+- `GastoException` - If file cannot be written
+
+**Process:**
+1. Loads existing expenses from file
+2. Adds new expense to list
+3. Writes entire list back to file with pretty printing
+
+**Implementation:**
+
+```java
+@Override
+public void save(Gasto gasto) {
+    List<Gasto> gastos = loadFromFile();
+    gastos.add(gasto);
+    saveToFile(gastos);
+}
+```
+
+<Note>
+  Does not validate for duplicate IDs. The service layer is responsible for ensuring unique IDs.
+</Note>
+
+#### update()
+
+```java
+@Override
+public void update(Gasto gastoActualizado)
+```
+
+Updates an existing expense by replacing it in the list.
+
+<ParamField path="gastoActualizado" type="Gasto" required>
+  The expense with updated values (ID must match existing expense)
+</ParamField>
+
+**Throws:**
+- `GastoException` - If file cannot be read or written
+
+**Process:**
+1. Loads all expenses from file
+2. Iterates through list to find matching ID
+3. Replaces the expense at that position
+4. Writes updated list back to file
+5. Returns after first match
+
+**Behavior:**
+- If ID is not found: method returns without error or exception
+- Updates only the first matching ID
+
+**Implementation:**
+
+```java
+@Override
+public void update(Gasto gastoActualizado) {
+    List<Gasto> gastos = loadFromFile();
+    for (int i = 0; i < gastos.size(); i++) {
+        if (gastos.get(i).getId().equals(gastoActualizado.getId())) {
+            gastos.set(i, gastoActualizado);
+            saveToFile(gastos);
+            return;
+        }
+    }
+}
+```
+
+#### deleteById()
+
+```java
+@Override
+public void deleteById(UUID id)
+```
+
+Removes an expense with the specified ID.
+
+<ParamField path="id" type="UUID" required>
+  The ID of the expense to delete
+</ParamField>
+
+**Throws:**
+- `GastoException` - If file cannot be read or written
+
+**Process:**
+1. Loads all expenses from file
+2. Uses `removeIf()` to filter out matching expense
+3. Writes updated list back to file only if an item was removed
+
+**Behavior:**
+- If ID not found: file is not rewritten (optimization)
+- Removes all expenses with matching ID (though IDs should be unique)
+
+**Implementation:**
+
+```java
+@Override
+public void deleteById(UUID id) {
+    List<Gasto> gastos = loadFromFile();
+    boolean eliminado = gastos.removeIf(gasto -> gasto.getId().equals(id));
+    if (eliminado) {
+        saveToFile(gastos);
+    }
+}
+```
+
+### Private Helper Methods
+
+#### loadFromFile()
+
+```java
+private List<Gasto> loadFromFile()
+```
+
+Reads and deserializes expenses from the JSON file.
+
+<ResponseField name="return" type="List<Gasto>">
+  List of expenses from file, or empty list if file doesn't exist
+</ResponseField>
+
+**Throws:**
+- `GastoException` - Wraps `IOException` if file read or JSON parsing fails
+
+**Logic:**
+
+```java
+private List<Gasto> loadFromFile() {
+    File file = new File(RUTA_ARCHIVO);
+    if (!file.exists() || file.length() == 0) {
+        return new ArrayList<>();
+    }
+    try {
+        return objectMapper.readValue(file, new TypeReference<List<Gasto>>() {});
+    } catch (IOException e) {
+        throw new GastoException("Error al leer el archivo de gastos: " + e.getMessage());
+    }
+}
+```
+
+**Error Handling:**
+- File doesn't exist → returns empty list
+- File exists but empty (0 bytes) → returns empty list
+- File exists but invalid JSON → throws `GastoException`
+
+#### saveToFile()
+
+```java
+private void saveToFile(List<Gasto> gastos)
+```
+
+Serializes and writes expenses to the JSON file with pretty formatting.
+
+<ParamField path="gastos" type="List<Gasto>" required>
+  List of expenses to write to file
+</ParamField>
+
+**Throws:**
+- `GastoException` - Wraps `IOException` if file cannot be written
+
+**Logic:**
+
+```java
+private void saveToFile(List<Gasto> gastos) {
+    try {
+        objectMapper.writerWithDefaultPrettyPrinter()
+                    .writeValue(new File(RUTA_ARCHIVO), gastos);
+    } catch (IOException e) {
+        throw new GastoException("Error al guardar en el archivo de gastos: " + e.getMessage());
+    }
+}
+```
+
+**Output Format:**
+- JSON array with pretty printing
+- Each expense is an object with fields: id, titulo, motivo, fecha, monto
+- Dates formatted as `yyyy-MM-dd`
+
+### File Format Example
+
+```json
+[
+  {
+    "id": "a1b2c3d4-5678-90ab-cdef-1234567890ab",
+    "titulo": "Almuerzo",
+    "motivo": "Comida con cliente",
+    "fecha": "2024-03-15",
+    "monto": 45.50
+  },
+  {
+    "id": "b2c3d4e5-6789-01bc-def1-234567890abc",
+    "titulo": "Taxi",
+    "motivo": "Transporte a reunión",
+    "fecha": "2024-03-14",
+    "monto": 25.00
+  }
+]
+```
+
+## Complete Usage Example
+
+```java
+import com.mibanco.gastos.repository.GastoRepository;
+import com.mibanco.gastos.repository.FileGastoRepository;
+import com.mibanco.gastos.model.Gasto;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+import java.util.List;
+import java.util.Optional;
+
+public class RepositoryExample {
+    public static void main(String[] args) {
+        // Create repository instance
+        GastoRepository repository = new FileGastoRepository();
+        
+        // Save a new expense
+        Gasto nuevoGasto = new Gasto(
+            UUID.randomUUID(),
+            "Almuerzo",
+            "Reunión de equipo",
+            LocalDate.now(),
+            new BigDecimal("45.50")
+        );
+        repository.save(nuevoGasto);
+        
+        // Find all expenses
+        List<Gasto> todos = repository.findAll();
+        System.out.println("Total gastos: " + todos.size());
+        
+        // Find specific expense
+        UUID id = nuevoGasto.getId();
+        Optional<Gasto> encontrado = repository.findById(id);
+        encontrado.ifPresent(g -> System.out.println("Encontrado: " + g));
+        
+        // Update expense
+        if (encontrado.isPresent()) {
+            Gasto gasto = encontrado.get();
+            gasto.setMonto(new BigDecimal("50.00"));
+            repository.update(gasto);
+        }
+        
+        // Delete expense
+        repository.deleteById(id);
+        
+        // Verify deletion
+        System.out.println("After delete: " + repository.findAll().size());
+    }
+}
+```
+
+## Error Handling
+
+<Expandable title="GastoException Scenarios">
+  The `FileGastoRepository` throws `GastoException` in these cases:
+
+  **Read Errors:**
+  ```
+  "Error al leer el archivo de gastos: {IOException message}"
+  ```
+  - File exists but is corrupted/invalid JSON
+  - File permissions prevent reading
+  - Disk I/O errors
+
+  **Write Errors:**
+  ```
+  "Error al guardar en el archivo de gastos: {IOException message}"
+  ```
+  - File permissions prevent writing
+  - Disk full
+  - Invalid path
+  - Disk I/O errors
+</Expandable>
+
+**Example:**
+
+```java
+try {
+    List<Gasto> gastos = repository.findAll();
+} catch (GastoException e) {
+    System.err.println("Repository error: " + e.getMessage());
+    // Handle error (log, retry, notify user, etc.)
+}
+```
+
+## Performance Considerations
+
+<Note>
+  The `FileGastoRepository` implementation loads the entire file into memory for each operation. This design is suitable for:
+  - Small to medium datasets (hundreds to thousands of expenses)
+  - Applications where simplicity is prioritized over performance
+  - Development and testing environments
+</Note>
+
+**Performance Characteristics:**
+
+| Operation | Time Complexity | Disk I/O |
+|-----------|----------------|----------|
+| findAll() | O(n) | 1 read |
+| findById() | O(n) | 1 read |
+| save() | O(n) | 1 read + 1 write |
+| update() | O(n) | 1 read + 1 write |
+| deleteById() | O(n) | 1 read + 1 write |
+
+**Optimization Notes:**
+- Each write operation rewrites the entire file
+- Consider database implementation for large datasets or high concurrency
+- No caching layer - each operation reads from disk
+
+## Dependencies
+
+- **Jackson Core:** JSON serialization/deserialization (`ObjectMapper`)
+- **Jackson Datatype JSR310:** Java 8 date/time support (`JavaTimeModule`)
+- **Gasto Model:** Domain entity
+- **GastoException:** Custom exception type
+- Java standard libraries: `File`, `IOException`, `List`, `ArrayList`, `Optional`, `UUID`

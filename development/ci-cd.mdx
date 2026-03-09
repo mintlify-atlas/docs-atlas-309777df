@@ -1,0 +1,310 @@
+---
+title: 'CI/CD Pipeline'
+description: 'Continuous Integration and Continuous Deployment with GitHub Actions'
+---
+
+## Overview
+
+The project uses **GitHub Actions** for automated continuous integration. Every push or pull request to the main branches triggers automatic compilation and testing, ensuring code quality and preventing regressions.
+
+## Pipeline Architecture
+
+<Steps>
+  <Step title="Code Push">
+    Developer pushes code to `main` or `master` branch, or creates a pull request
+  </Step>
+  
+  <Step title="GitHub Actions Trigger">
+    Workflow automatically starts on the GitHub-hosted Ubuntu runner
+  </Step>
+  
+  <Step title="Environment Setup">
+    Checkout code, install JDK 17, and configure Maven cache
+  </Step>
+  
+  <Step title="Build & Test">
+    Maven compiles the project and runs all JUnit tests
+  </Step>
+  
+  <Step title="Results">
+    Build status is reported back to GitHub (green check or red X)
+  </Step>
+</Steps>
+
+## Workflow Configuration
+
+The CI pipeline is defined in `.github/workflows/maven.yml`:
+
+```yaml
+name: Java CI with Maven
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+          cache: maven
+
+      - name: Compilar y ejecutar pruebas con Maven
+        run: mvn -B package --file pom.xml
+```
+
+## Trigger Events
+
+The workflow runs automatically on two events:
+
+<CodeGroup>
+```yaml Push Event
+on:
+  push:
+    branches: ["main", "master"]
+```
+
+```yaml Pull Request Event
+on:
+  pull_request:
+    branches: ["main", "master"]
+```
+</CodeGroup>
+
+<Note>
+Both `main` and `master` branches are monitored to support different repository naming conventions.
+</Note>
+
+## Build Steps Explained
+
+### 1. Code Checkout
+
+```yaml
+- name: Checkout del código
+  uses: actions/checkout@v4
+```
+
+Uses the official GitHub action to clone the repository code to the runner. Version `v4` is the latest stable version with improved performance and security.
+
+### 2. Java Environment Setup
+
+```yaml
+- name: Configurar JDK 17
+  uses: actions/setup-java@v4
+  with:
+    java-version: "17"
+    distribution: "temurin"
+    cache: maven
+```
+
+<Accordion title="Configuration Details">
+- **java-version: "17"** - Installs Java Development Kit version 17, matching the project requirements
+- **distribution: "temurin"** - Uses Eclipse Temurin (formerly AdoptOpenJDK), a reliable open-source JDK distribution
+- **cache: maven** - Caches Maven dependencies between runs to speed up subsequent builds
+</Accordion>
+
+### 3. Build and Test Execution
+
+```yaml
+- name: Compilar y ejecutar pruebas con Maven
+  run: mvn -B package --file pom.xml
+```
+
+The `mvn package` command performs multiple operations:
+
+<Steps>
+  <Step title="Compile Source Code">
+    Compiles all Java files in `src/main/java`
+  </Step>
+  
+  <Step title="Compile Test Code">
+    Compiles all test files in `src/test/java`
+  </Step>
+  
+  <Step title="Run Unit Tests">
+    Executes all JUnit 5 tests via Maven Surefire plugin
+  </Step>
+  
+  <Step title="Package Application">
+    Creates the JAR artifact if all tests pass
+  </Step>
+</Steps>
+
+<Note>
+The `-B` flag runs Maven in **batch mode**, which disables interactive output and prevents the build from hanging while waiting for user input.
+</Note>
+
+## Maven Surefire Plugin
+
+The test execution is handled by the Surefire plugin configured in `pom.xml`:
+
+```xml
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <version>3.1.2</version>
+</plugin>
+```
+
+This plugin:
+- Automatically discovers and runs JUnit 5 tests
+- Generates test reports in XML format
+- Fails the build if any test fails
+- Provides detailed console output for debugging
+
+## Build Status and Feedback
+
+### Success Scenario
+
+When all tests pass, the workflow:
+- Displays a green checkmark on the commit/PR
+- Allows the PR to be merged (if using branch protection rules)
+- Confirms the code meets quality standards
+
+### Failure Scenario
+
+When compilation fails or tests fail, the workflow:
+- Displays a red X on the commit/PR
+- Blocks PR merging (if branch protection is enabled)
+- Provides detailed logs to identify the issue
+
+<CodeGroup>
+```bash Viewing Logs (Success)
+✓ Checkout del código
+✓ Configurar JDK 17
+✓ Compilar y ejecutar pruebas con Maven
+  [INFO] Tests run: 6, Failures: 0, Errors: 0, Skipped: 0
+  [INFO] BUILD SUCCESS
+```
+
+```bash Viewing Logs (Failure)
+✓ Checkout del código
+✓ Configurar JDK 17
+✗ Compilar y ejecutar pruebas con Maven
+  [ERROR] Tests run: 6, Failures: 1, Errors: 0, Skipped: 0
+  [INFO] BUILD FAILURE
+```
+</CodeGroup>
+
+## Benefits of CI Pipeline
+
+<CardGroup cols={2}>
+  <Card title="Early Detection" icon="magnifying-glass">
+    Catches bugs and compilation errors immediately after code is pushed
+  </Card>
+  <Card title="Consistent Testing" icon="rotate">
+    Every change is tested in a clean environment, preventing "works on my machine" issues
+  </Card>
+  <Card title="Code Quality" icon="shield-check">
+    Enforces that all code passes tests before being merged
+  </Card>
+  <Card title="Automated Workflow" icon="gears">
+    No manual intervention required - tests run automatically
+  </Card>
+</CardGroup>
+
+## Local Testing Before Push
+
+To avoid CI failures, run these commands locally before pushing:
+
+<Steps>
+  <Step title="Compile the project">
+    ```bash
+    mvn clean compile
+    ```
+  </Step>
+  
+  <Step title="Run all tests">
+    ```bash
+    mvn test
+    ```
+  </Step>
+  
+  <Step title="Full build verification">
+    ```bash
+    mvn clean package
+    ```
+    This runs the exact same command as the CI pipeline.
+  </Step>
+</Steps>
+
+## Performance Optimization
+
+The workflow includes several optimizations for faster builds:
+
+### Maven Dependency Caching
+
+```yaml
+cache: maven
+```
+
+This caches the `.m2/repository` directory, avoiding re-downloading dependencies on every run. Typical time savings: **30-60 seconds per build**.
+
+### Batch Mode
+
+```yaml
+run: mvn -B package
+```
+
+The `-B` flag eliminates progress animation and interactive prompts, reducing overhead and log size.
+
+## Future Enhancements
+
+<AccordionGroup>
+  <Accordion title="Code Coverage Reports">
+    Add JaCoCo plugin to generate test coverage reports and enforce minimum coverage thresholds.
+  </Accordion>
+  
+  <Accordion title="Multi-Java Version Testing">
+    Test against Java 17, 21, and future LTS versions to ensure compatibility.
+  </Accordion>
+  
+  <Accordion title="Deployment Automation">
+    Add a deployment job that publishes JAR artifacts to GitHub Releases when a new tag is created.
+  </Accordion>
+  
+  <Accordion title="Static Code Analysis">
+    Integrate tools like SonarQube or Checkstyle for automated code quality checks.
+  </Accordion>
+</AccordionGroup>
+
+## Monitoring Build Status
+
+### Via GitHub Interface
+
+1. Navigate to the **Actions** tab in the repository
+2. View all workflow runs with timestamps and status
+3. Click any run to see detailed logs for each step
+
+### Via Commit/PR Interface
+
+- Each commit shows a checkmark (✓) or X (✗) next to it
+- Click "Details" to view the full workflow run
+- PR pages show all checks that must pass before merging
+
+### Via GitHub CLI
+
+```bash
+# View recent workflow runs
+gh run list
+
+# View specific run details
+gh run view <run-id>
+
+# Watch a run in progress
+gh run watch
+```
+
+<Note>
+The GitHub CLI (`gh`) provides a convenient way to monitor CI/CD status directly from your terminal.
+</Note>

@@ -1,0 +1,242 @@
+---
+title: Installation
+description: Set up the Gestión de Gastos expense tracking system on your machine
+---
+
+## Prerequisites
+
+Before installing Gestión de Gastos, ensure you have the following tools installed on your system:
+
+### Java Development Kit (JDK) 17
+
+The application requires **Java 17 or higher** to run.
+
+<CodeGroup>
+
+```bash macOS (Homebrew)
+brew install openjdk@17
+```
+
+```bash Ubuntu/Debian
+sudo apt update
+sudo apt install openjdk-17-jdk
+```
+
+```bash Windows (Chocolatey)
+choco install openjdk17
+```
+
+</CodeGroup>
+
+Verify your Java installation:
+
+```bash
+java -version
+```
+
+You should see output similar to:
+
+```
+openjdk version "17.0.x" 2024-xx-xx
+OpenJDK Runtime Environment (build 17.0.x+x)
+OpenJDK 64-Bit Server VM (build 17.0.x+x, mixed mode, sharing)
+```
+
+### Apache Maven
+
+Maven is required to build the project and manage dependencies.
+
+<CodeGroup>
+
+```bash macOS (Homebrew)
+brew install maven
+```
+
+```bash Ubuntu/Debian
+sudo apt update
+sudo apt install maven
+```
+
+```bash Windows (Chocolatey)
+choco install maven
+```
+
+</CodeGroup>
+
+Verify your Maven installation:
+
+```bash
+mvn -version
+```
+
+You should see output showing Maven 3.6 or higher.
+
+<Note>
+  If you're using Windows, make sure to add Java and Maven to your system PATH environment variable after installation.
+</Note>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    Clone the project from GitHub to your local machine:
+    
+    ```bash
+    git clone https://github.com/AngheloMP10/gestion-gastos-mibanco.git
+    ```
+  </Step>
+
+  <Step title="Navigate to Project Directory">
+    Change into the project directory:
+    
+    ```bash
+    cd gestion-gastos-mibanco
+    ```
+  </Step>
+
+  <Step title="Compile and Install Dependencies">
+    Build the project and download all required dependencies:
+    
+    ```bash
+    mvn clean install
+    ```
+    
+    This command will:
+    - Clean any previous build artifacts
+    - Download Jackson libraries for JSON persistence
+    - Download JUnit 5 for testing
+    - Compile all source code
+    - Run the unit tests
+    - Package the application
+    
+    <Warning>
+      The first time you run this command, Maven will download all dependencies which may take a few minutes depending on your internet connection.
+    </Warning>
+  </Step>
+
+  <Step title="Verify Installation">
+    Check that the build was successful. You should see output ending with:
+    
+    ```
+    [INFO] BUILD SUCCESS
+    [INFO] ------------------------------------------------------------------------
+    ```
+  </Step>
+</Steps>
+
+## Project Dependencies
+
+The application uses the following external libraries (automatically managed by Maven):
+
+### Jackson Libraries
+
+For JSON serialization and persistence:
+
+```xml
+<dependency>
+    <groupId>com.fasterxml.jackson.core</groupId>
+    <artifactId>jackson-databind</artifactId>
+    <version>2.15.2</version>
+</dependency>
+
+<dependency>
+    <groupId>com.fasterxml.jackson.datatype</groupId>
+    <artifactId>jackson-datatype-jsr310</artifactId>
+    <version>2.15.2</version>
+</dependency>
+```
+
+<Note>
+  The `jackson-datatype-jsr310` dependency adds support for Java 8+ date/time types like `LocalDate`, which is used for expense dates in the application.
+</Note>
+
+### JUnit 5
+
+For unit testing (test scope only):
+
+```xml
+<dependency>
+    <groupId>org.junit.jupiter</groupId>
+    <artifactId>junit-jupiter-api</artifactId>
+    <version>5.10.0</version>
+    <scope>test</scope>
+</dependency>
+```
+
+## Running Tests
+
+To verify that everything is installed correctly, run the unit tests:
+
+```bash
+mvn test
+```
+
+The test suite includes comprehensive tests for the `GastoService` layer, using an in-memory fake repository to ensure tests are fast and deterministic.
+
+Expected output:
+
+```
+[INFO] -------------------------------------------------------
+[INFO]  T E S T S
+[INFO] -------------------------------------------------------
+[INFO] Running com.mibanco.gastos.service.GastoServiceTest
+[INFO] Tests run: X, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] Results:
+[INFO] 
+[INFO] Tests run: X, Failures: 0, Errors: 0, Skipped: 0
+[INFO] 
+[INFO] BUILD SUCCESS
+```
+
+## File Structure
+
+After installation, your project structure will look like this:
+
+```
+gestion-gastos-mibanco/
+├── src/
+│   ├── main/
+│   │   └── java/
+│   │       └── com/mibanco/gastos/
+│   │           ├── model/          # Gasto entity
+│   │           ├── repository/     # Data access layer
+│   │           ├── service/        # Business logic
+│   │           ├── ui/             # Console interface
+│   │           └── exception/      # Custom exceptions
+│   └── test/
+│       └── java/
+│           └── com/mibanco/gastos/
+│               └── service/        # Service layer tests
+├── pom.xml                         # Maven configuration
+├── gastos.json                     # Created on first run
+└── README.md
+```
+
+<Note>
+  The `gastos.json` file will be created automatically in the project root directory the first time you add an expense. This file contains all your expense data.
+</Note>
+
+## Troubleshooting
+
+### Maven Build Fails
+
+If you encounter build errors:
+
+1. Ensure you have Java 17 or higher: `java -version`
+2. Clear Maven cache: `mvn clean`
+3. Force update dependencies: `mvn clean install -U`
+
+### Permission Denied
+
+On Unix-based systems, if you get permission errors when running Maven:
+
+```bash
+chmod +x mvnw
+```
+
+## Next Steps
+
+<Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+  Learn how to run the application and manage your first expenses
+</Card>

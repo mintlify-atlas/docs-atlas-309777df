@@ -1,0 +1,324 @@
+---
+title: "Gasto Model"
+description: "Complete API reference for the Gasto domain model class"
+---
+
+## Overview
+
+The `Gasto` class represents an expense entity in the Mibanco expense management system. It uses `BigDecimal` for precise monetary calculations and `UUID` for unique identification.
+
+**Package:** `com.mibanco.gastos.model`
+
+**Location:** `src/main/java/com/mibanco/gastos/model/Gasto.java`
+
+## Fields
+
+<ParamField path="id" type="UUID">
+  Unique identifier for the expense. Generated automatically when creating new expenses.
+</ParamField>
+
+<ParamField path="titulo" type="String">
+  Title or name of the expense. Required field that cannot be empty.
+</ParamField>
+
+<ParamField path="motivo" type="String">
+  Reason or description for the expense. Optional field providing additional context.
+</ParamField>
+
+<ParamField path="fecha" type="LocalDate">
+  Date when the expense occurred. Formatted as `yyyy-MM-dd` in JSON serialization.
+  
+  <Note>
+    Uses `@JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")` annotation for consistent date formatting.
+  </Note>
+</ParamField>
+
+<ParamField path="monto" type="BigDecimal">
+  Amount of the expense. Automatically rounded to 2 decimal places using commercial rounding (HALF_UP).
+  
+  <Note>
+    The setter applies `RoundingMode.HALF_UP` to ensure all amounts have exactly 2 decimal places.
+  </Note>
+</ParamField>
+
+## Constructors
+
+### Default Constructor
+
+```java
+public Gasto()
+```
+
+Creates an empty `Gasto` instance with all fields set to `null`.
+
+**Usage:**
+
+```java
+Gasto gasto = new Gasto();
+gasto.setId(UUID.randomUUID());
+gasto.setTitulo("Almuerzo");
+gasto.setFecha(LocalDate.now());
+gasto.setMonto(new BigDecimal("25.50"));
+```
+
+### Full Constructor
+
+```java
+public Gasto(UUID id, String titulo, String motivo, LocalDate fecha, BigDecimal monto)
+```
+
+Creates a `Gasto` instance with all fields initialized.
+
+<ParamField path="id" type="UUID" required>
+  Unique identifier for the expense
+</ParamField>
+
+<ParamField path="titulo" type="String" required>
+  Title of the expense
+</ParamField>
+
+<ParamField path="motivo" type="String">
+  Reason for the expense (can be null)
+</ParamField>
+
+<ParamField path="fecha" type="LocalDate" required>
+  Date of the expense
+</ParamField>
+
+<ParamField path="monto" type="BigDecimal" required>
+  Amount to be charged (will be rounded to 2 decimals)
+</ParamField>
+
+**Usage:**
+
+```java
+Gasto gasto = new Gasto(
+    UUID.randomUUID(),
+    "Taxi",
+    "Transporte a reunión con cliente",
+    LocalDate.of(2024, 3, 15),
+    new BigDecimal("35.75")
+);
+```
+
+<Note>
+  The constructor uses `setMonto()` internally to ensure proper rounding is applied.
+</Note>
+
+## Methods
+
+### getId()
+
+```java
+public UUID getId()
+```
+
+Returns the unique identifier of the expense.
+
+<ResponseField name="return" type="UUID">
+  The UUID identifier
+</ResponseField>
+
+### setId()
+
+```java
+public void setId(UUID id)
+```
+
+Sets the unique identifier of the expense.
+
+<ParamField path="id" type="UUID">
+  The UUID to assign
+</ParamField>
+
+### getTitulo()
+
+```java
+public String getTitulo()
+```
+
+Returns the title of the expense.
+
+<ResponseField name="return" type="String">
+  The expense title
+</ResponseField>
+
+### setTitulo()
+
+```java
+public void setTitulo(String titulo)
+```
+
+Sets the title of the expense.
+
+<ParamField path="titulo" type="String">
+  The title to assign
+</ParamField>
+
+### getMotivo()
+
+```java
+public String getMotivo()
+```
+
+Returns the reason/description for the expense.
+
+<ResponseField name="return" type="String">
+  The expense reason or null if not set
+</ResponseField>
+
+### setMotivo()
+
+```java
+public void setMotivo(String motivo)
+```
+
+Sets the reason/description for the expense.
+
+<ParamField path="motivo" type="String">
+  The reason to assign
+</ParamField>
+
+### getFecha()
+
+```java
+public LocalDate getFecha()
+```
+
+Returns the date when the expense occurred.
+
+<ResponseField name="return" type="LocalDate">
+  The expense date
+</ResponseField>
+
+### setFecha()
+
+```java
+public void setFecha(LocalDate fecha)
+```
+
+Sets the date of the expense.
+
+<ParamField path="fecha" type="LocalDate">
+  The date to assign
+</ParamField>
+
+### getMonto()
+
+```java
+public BigDecimal getMonto()
+```
+
+Returns the amount of the expense, always with 2 decimal places.
+
+<ResponseField name="return" type="BigDecimal">
+  The expense amount rounded to 2 decimals
+</ResponseField>
+
+### setMonto()
+
+```java
+public void setMonto(BigDecimal monto)
+```
+
+Sets the amount of the expense with automatic rounding to 2 decimal places using commercial rounding (HALF_UP).
+
+<ParamField path="monto" type="BigDecimal">
+  The amount to assign (will be rounded if not null)
+</ParamField>
+
+<Expandable title="Rounding Behavior">
+  The method applies `RoundingMode.HALF_UP` which rounds to the nearest neighbor. If both neighbors are equidistant, rounds up.
+  
+  **Examples:**
+  - `25.126` → `25.13`
+  - `25.125` → `25.13`
+  - `25.124` → `25.12`
+  
+  **Implementation:**
+  ```java
+  public void setMonto(BigDecimal monto) {
+      if (monto != null) {
+          this.monto = monto.setScale(2, RoundingMode.HALF_UP);
+      }
+  }
+  ```
+</Expandable>
+
+### toString()
+
+```java
+@Override
+public String toString()
+```
+
+Returns a formatted string representation of the expense for display purposes.
+
+<ResponseField name="return" type="String">
+  Formatted string in the pattern: `[ID_SHORT] FECHA | TITULO | MOTIVO | S/ MONTO`
+</ResponseField>
+
+**Format Pattern:**
+```
+[{first 8 chars of UUID}] {yyyy-MM-dd} | {titulo} | {motivo} | S/ {monto}
+```
+
+**Example Output:**
+```
+[a1b2c3d4] 2024-03-15 | Almuerzo | Comida de trabajo | S/ 45.50
+```
+
+**Usage:**
+
+```java
+Gasto gasto = new Gasto(
+    UUID.fromString("a1b2c3d4-5678-90ab-cdef-1234567890ab"),
+    "Taxi",
+    "Transporte cliente",
+    LocalDate.of(2024, 3, 15),
+    new BigDecimal("35.75")
+);
+
+System.out.println(gasto);
+// Output: [a1b2c3d4] 2024-03-15 | Taxi | Transporte cliente | S/ 35.75
+```
+
+## Complete Usage Example
+
+```java
+import com.mibanco.gastos.model.Gasto;
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.UUID;
+
+public class GastoExample {
+    public static void main(String[] args) {
+        // Create a new expense
+        Gasto gasto = new Gasto(
+            UUID.randomUUID(),
+            "Almuerzo Ejecutivo",
+            "Reunión con equipo de ventas",
+            LocalDate.now(),
+            new BigDecimal("78.90")
+        );
+        
+        // Access fields
+        System.out.println("ID: " + gasto.getId());
+        System.out.println("Título: " + gasto.getTitulo());
+        System.out.println("Monto: S/ " + gasto.getMonto());
+        
+        // Modify fields
+        gasto.setMonto(new BigDecimal("80.00"));
+        
+        // Display formatted output
+        System.out.println(gasto.toString());
+    }
+}
+```
+
+## Dependencies
+
+- **Jackson Annotations:** `@JsonFormat` for date serialization
+- **Java Time API:** `LocalDate` for date handling
+- **Java Math:** `BigDecimal` and `RoundingMode` for precise decimal arithmetic
+- **Java Util:** `UUID` for unique identification
