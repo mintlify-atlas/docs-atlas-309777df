@@ -1,0 +1,79 @@
+{
+  "projectType": "cli-tool",
+  "projectName": "Gestión de Gastos Mibanco",
+  "projectDescription": "Java console application for personal expense management with CRUD operations, JSON persistence, and financial precision using BigDecimal.",
+  "theme": "linden",
+  "primaryColor": "#003d82",
+  "lightColor": "#0066cc",
+  "darkColor": "#002554",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "installation",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "User Guide",
+        "pages": [
+          "guide/usage",
+          "guide/commands",
+          "guide/data-persistence"
+        ]
+      },
+      {
+        "group": "Architecture",
+        "pages": [
+          "architecture/overview",
+          "architecture/layered-structure",
+          "architecture/technical-decisions"
+        ]
+      },
+      {
+        "group": "Development",
+        "pages": [
+          "development/testing",
+          "development/ci-cd",
+          "development/contributing"
+        ]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api/gasto-model",
+          "api/gasto-service",
+          "api/gasto-repository"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Complete CRUD operations for expense management",
+    "JSON file persistence with Jackson library",
+    "Financial precision with BigDecimal and HALF_UP rounding",
+    "Dynamic filtering by month and year",
+    "Custom exception handling with GastoException",
+    "Layered architecture following clean code principles",
+    "UUID-based identification with short ID support",
+    "Unit testing with JUnit 5",
+    "Continuous Integration with GitHub Actions"
+  ],
+  "publicApiSurface": [
+    "GastoService.agregarGasto(String, String, LocalDate, BigDecimal)",
+    "GastoService.actualizarGasto(String, String, String, LocalDate, BigDecimal)",
+    "GastoService.eliminarGasto(String)",
+    "GastoService.listarGastos()",
+    "GastoService.filtrarGastosPorMes(int, int)",
+    "GastoRepository.findAll()",
+    "GastoRepository.findById(UUID)",
+    "GastoRepository.save(Gasto)",
+    "GastoRepository.update(Gasto)",
+    "GastoRepository.deleteById(UUID)",
+    "Gasto model with UUID, titulo, motivo, fecha, monto fields",
+    "FileGastoRepository with JSON persistence",
+    "Consola main menu interface"
+  ]
+}
